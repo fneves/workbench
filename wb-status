@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# wb-status: Orchestrator TUI dashboard
+# Shows all active tasks with live diff stats and status
+
+WORKBENCH_STATE_DIR="/tmp/workbench"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+NC='\033[0m'
+BOLD='\033[1m'
+DIM='\033[2m'
+REVERSE='\033[7m'
+
+# Track selected row
+SELECTED=0
+TASK_BRANCHES=()
+
+get_tasks() {
+    TASK_BRANCHES=()
+    if [[ -d "$WORKBENCH_STATE_DIR" ]]; then
+        for f in "$WORKBENCH_STATE_DIR"/*.json; do
+            [[ -f "$f" ]] || continue
+            TASK_BRANCHES+=("$(basename "$f" .json)")
+        done
+    fi
+}
+
+render() {
+    clear
+    local cols
+    cols=$(tput cols 2>/dev/null || echo 80)
+
+    # Header
+    echo ""
+    echo -e "  ${PURPLE}${BOLD}⚡ workbench${NC}  ${DIM}orchestrator${NC}"
+    echo -e "  ${DIM}$(date +"%a %b %d %H:%M:%S") · $(cat "$WORKBENCH_STATE_DIR/.repo" 2>/dev/null || echo "no repo")${NC}"
+    echo ""
+
+    # Task list header
+    printf "  ${DIM}%-3s  %-28s %-10s %8s %8s %7s  %-10s${NC}\n" \
+        "#" "BRANCH" "STATUS" "ADDED" "REMOVED" "FILES" "AGENT"
+    echo -e "  ${DIM}$(printf '─%.0s' $(seq 1 $((cols - 4))))${NC}"
+
+    get_tasks
+
+    if [[ ${#TASK_BRANCHES[@]} -eq 0 ]]; then
+        echo ""
+        echo -e "  ${DIM}No active tasks. Press ${NC}${CYAN}n${NC}${DIM} to spawn one.${NC}"
+    else
+        local idx=0
+        for branch in "${TASK_BRANCHES[@]}"; do
+            local state_file="$WORKBENCH_STATE_DIR/$branch.json"
+            if [[ ! -f "$state_file" ]]; then
+                continue
+            fi
+
+            local status added removed files agent mode
+            status="$(jq -r '.status // "unknown"' "$state_file")"
+            added="$(jq -r '.diff_added // 0' "$state_file")"
+            removed="$(jq -r '.diff_removed // 0' "$state_file")"
+            files="$(jq -r '.diff_files // 0' "$state_file")"
+            agent="$(jq -r '.agent // "?"' "$state_file")"
+            mode="$(jq -r '.mode // "worktree"' "$state_file")"
+
+            # Status icon and color
+            local status_display icon status_color
+            case "$status" in
+                running)    icon="●"; status_color="$GREEN" ;;
+                prompting)  icon="⏳"; status_color="$YELLOW" ;;
+                done)       icon="✓"; status_color="$CYAN" ;;
+                failed)     icon="✗"; status_color="$RED" ;;
+                starting)   icon="◔"; status_color="$BLUE" ;;
+                *)          icon="?"; status_color="$DIM" ;;
+            esac
+
+            status_display="${status_color}${icon} ${status}${NC}"
+
+            # Mode indicator
+            local mode_icon=""
+            if [[ "$mode" == "container" ]]; then
+                mode_icon=" 📦"
+            fi
+
+            # Highlight selected row
+            local prefix="  "
+            local suffix=""
+            if [[ $idx -eq $SELECTED ]]; then
+                prefix="  ${REVERSE}"
+                suffix="${NC}"
+            fi
+
+            printf "${prefix}%-3s  %-28s %-22b ${GREEN}%+7s${NC} ${RED}%8s${NC} %6s  ${DIM}%-10s${NC}${suffix}\n" \
+                "$((idx + 1))" \
+                "${branch:0:28}${mode_icon}" \
+                "$status_display" \
+                "+$added" \
+                "-$removed" \
+                "$files" \
+                "$agent"
+
+            idx=$((idx + 1))
+        done
+    fi
+
+    # Footer controls
+    echo ""
+    echo -e "  ${DIM}$(printf '─%.0s' $(seq 1 $((cols - 4))))${NC}"
+    echo -e "  ${CYAN}n${NC} new task   ${CYAN}↑↓${NC} select   ${CYAN}enter${NC} jump to tab   ${CYAN}d${NC} global diff   ${CYAN}k${NC} kill   ${CYAN}q${NC} quit"
+
+    # Notification area
+    local notify_count=0
+    for branch in "${TASK_BRANCHES[@]}"; do
+        local sf="$WORKBENCH_STATE_DIR/$branch.json"
+        [[ -f "$sf" ]] || continue
+        local st
+        st="$(jq -r '.status' "$sf")"
+        if [[ "$st" == "done" ]] || [[ "$st" == "prompting" ]] || [[ "$st" == "failed" ]]; then
+            if [[ $notify_count -eq 0 ]]; then
+                echo ""
+                echo -e "  ${YELLOW}${BOLD}Notifications:${NC}"
+            fi
+            case "$st" in
+                done)      echo -e "    ${CYAN}✓${NC} ${branch} — agent finished" ;;
+                prompting) echo -e "    ${YELLOW}⏳${NC} ${branch} — waiting for input" ;;
+                failed)    echo -e "    ${RED}✗${NC} ${branch} — agent failed" ;;
+            esac
+            notify_count=$((notify_count + 1))
+        fi
+    done
+}
+
+spawn_interactive() {
+    echo ""
+    echo -ne "  ${CYAN}Branch name: ${NC}"
+    read -r branch_name
+    if [[ -z "$branch_name" ]]; then
+        return
+    fi
+
+    echo -ne "  ${CYAN}Task prompt (empty for interactive): ${NC}"
+    read -r prompt
+
+    echo -ne "  ${CYAN}Agent [claude/opencode] (default: claude): ${NC}"
+    read -r agent
+    agent="${agent:-claude}"
+
+    echo -ne "  ${CYAN}Mode [worktree/container] (default: worktree): ${NC}"
+    read -r mode
+    mode="${mode:-worktree}"
+
+    echo -ne "  ${CYAN}Base branch (default: main): ${NC}"
+    read -r base
+    base="${base:-main}"
+
+    local cmd="$SCRIPT_DIR/wb-spawn -b '$branch_name' -a '$agent' -m '$mode' -f '$base'"
+    if [[ -n "$prompt" ]]; then
+        cmd="$cmd -p '$prompt'"
+    else
+        cmd="$cmd -i"
+    fi
+
+    eval "$cmd"
+    sleep 1
+}
+
+jump_to_tab() {
+    if [[ ${#TASK_BRANCHES[@]} -eq 0 ]]; then
+        return
+    fi
+    local branch="${TASK_BRANCHES[$SELECTED]}"
+    # Zellij tabs are 0-indexed, tab 0 is orchestrator, tasks start at 1
+    local tab_idx=$((SELECTED + 1))
+
+    if [[ -n "${ZELLIJ:-}" ]]; then
+        zellij action go-to-tab "$((tab_idx + 1))" 2>/dev/null || {
+            # Fallback: try to find the tab by name
+            echo -e "${DIM}  Switching to tab: $branch${NC}"
+            zellij action go-to-tab-name "$branch" 2>/dev/null || true
+        }
+    fi
+}
+
+kill_task() {
+    if [[ ${#TASK_BRANCHES[@]} -eq 0 ]]; then
+        return
+    fi
+    local branch="${TASK_BRANCHES[$SELECTED]}"
+    echo ""
+    echo -ne "  ${RED}Kill task '$branch'? [y/N]: ${NC}"
+    read -rsn1 confirm
+    echo ""
+    if [[ "$confirm" == "y" ]] || [[ "$confirm" == "Y" ]]; then
+        "$SCRIPT_DIR/wb-cleanup" "$branch"
+        SELECTED=0
+        sleep 1
+    fi
+}
+
+global_diff() {
+    # Show an fzf picker across all worktrees
+    local all_files=""
+    for branch in "${TASK_BRANCHES[@]}"; do
+        local sf="$WORKBENCH_STATE_DIR/$branch.json"
+        [[ -f "$sf" ]] || continue
+        local wt
+        wt="$(jq -r '.worktree' "$sf")"
+        if [[ -d "$wt" ]]; then
+            local files
+            files="$(cd "$wt" && git diff --name-only HEAD 2>/dev/null | sed "s|^|$branch: |")"
+            if [[ -n "$files" ]]; then
+                all_files+="$files"$'\n'
+            fi
+        fi
+    done
+
+    if [[ -z "$all_files" ]]; then
+        echo -e "  ${DIM}No changes across any worktree${NC}"
+        sleep 2
+        return
+    fi
+
+    if command -v fzf &>/dev/null; then
+        local selected
+        selected="$(echo "$all_files" | fzf \
+            --header="Global diff — all worktrees" \
+            --preview='
+                branch=$(echo {} | cut -d: -f1)
+                file=$(echo {} | cut -d" " -f2-)
+                sf="/tmp/workbench/$branch.json"
+                wt=$(jq -r ".worktree" "$sf")
+                cd "$wt" && git diff HEAD --color -- "$file"
+            ' \
+            --preview-window=right:60%:wrap \
+            2>/dev/null)" || return 0
+
+        if [[ -n "$selected" ]]; then
+            local branch file wt
+            branch="$(echo "$selected" | cut -d: -f1)"
+            file="$(echo "$selected" | cut -d' ' -f2-)"
+            wt="$(jq -r '.worktree' "$WORKBENCH_STATE_DIR/$branch.json")"
+
+            if [[ -n "${ZELLIJ:-}" ]]; then
+                zellij run --floating --name "diff: $branch/$file" -- \
+                    bash -c "cd '$wt' && git diff HEAD -- '$file' --color | less -R"
+            fi
+        fi
+    fi
+}
+
+# --- Main loop ---
+while true; do
+    render
+
+    # Read input with timeout for auto-refresh
+    if read -rsn1 -t 3 key; then
+        case "$key" in
+            n) spawn_interactive ;;
+            q) exit 0 ;;
+            k) kill_task ;;
+            d) global_diff ;;
+            $'\x1b')
+                # Arrow keys (escape sequence)
+                read -rsn2 -t 0.1 seq || true
+                case "$seq" in
+                    '[A') # Up
+                        if [[ $SELECTED -gt 0 ]]; then
+                            SELECTED=$((SELECTED - 1))
+                        fi
+                        ;;
+                    '[B') # Down
+                        get_tasks
+                        if [[ $SELECTED -lt $((${#TASK_BRANCHES[@]} - 1)) ]]; then
+                            SELECTED=$((SELECTED + 1))
+                        fi
+                        ;;
+                esac
+                ;;
+            '') # Enter
+                jump_to_tab
+                ;;
+        esac
+    fi
+done

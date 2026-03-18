@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WORKBENCH_STATE_DIR="/tmp/workbench"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+REPO_ROOT="$(cat "$WORKBENCH_STATE_DIR/.repo" 2>/dev/null || git rev-parse --show-toplevel)"
+
+cleanup_task() {
+    local branch="$1"
+    local state_file="$WORKBENCH_STATE_DIR/$branch.json"
+    local worktree="$REPO_ROOT/.worktrees/$branch"
+    local wrapper="$WORKBENCH_STATE_DIR/$branch.run.sh"
+
+    echo -e "${YELLOW}Cleaning up: $branch${NC}"
+
+    # Kill agent process if running
+    if [[ -f "$state_file" ]]; then
+        local pid
+        pid="$(jq -r '.pid // empty' "$state_file" 2>/dev/null)"
+        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+            echo -e "  ${DIM}Killing agent (PID $pid)${NC}"
+            kill "$pid" 2>/dev/null || true
+            sleep 1
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    fi
+
+    # Remove worktree
+    if [[ -d "$worktree" ]]; then
+        echo -e "  ${DIM}Removing worktree: $worktree${NC}"
+        git -C "$REPO_ROOT" worktree remove --force "$worktree" 2>/dev/null || {
+            # Force remove if git complains
+            rm -rf "$worktree"
+            git -C "$REPO_ROOT" worktree prune 2>/dev/null || true
+        }
+    fi
+
+    # Clean up state files
+    rm -f "$state_file" "$wrapper"
+
+    echo -e "  ${GREEN}✓ Done${NC}"
+}
+
+if [[ "${1:-}" == "--all" ]]; then
+    echo -e "${BOLD}Cleaning up all tasks...${NC}"
+    echo ""
+
+    if [[ -d "$WORKBENCH_STATE_DIR" ]]; then
+        for f in "$WORKBENCH_STATE_DIR"/*.json; do
+            [[ -f "$f" ]] || continue
+            branch="$(basename "$f" .json)"
+            cleanup_task "$branch"
+        done
+    fi
+
+    # Kill Zellij session
+    if zellij list-sessions 2>/dev/null | grep -q "workbench"; then
+        echo -e "${YELLOW}Killing Zellij session...${NC}"
+        zellij delete-session workbench --force 2>/dev/null || true
+    fi
+
+    # Clean state dir
+    rm -rf "$WORKBENCH_STATE_DIR"
+
+    echo ""
+    echo -e "${GREEN}${BOLD}✓ All cleaned up${NC}"
+elif [[ -n "${1:-}" ]]; then
+    cleanup_task "$1"
+else
+    echo "Usage: wb-cleanup <branch> | --all"
+    exit 1
+fi

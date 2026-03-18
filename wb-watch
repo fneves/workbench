@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# wb-watch: File change watcher for a worktree
+# Shows diff stats with interactive file selection for full diffs
+
+WORKTREE="${1:-.}"
+BRANCH="${2:-$(basename "$WORKTREE")}"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Determine best diff tool
+DIFF_CMD="git diff --color"
+if command -v delta &>/dev/null; then
+    DIFF_CMD="git diff | delta"
+elif command -v diff-so-fancy &>/dev/null; then
+    DIFF_CMD="git diff | diff-so-fancy"
+fi
+
+# Determine if we have fzf for interactive selection
+HAS_FZF=false
+if command -v fzf &>/dev/null; then
+    HAS_FZF=true
+fi
+
+# Determine if we have lazygit
+HAS_LAZYGIT=false
+if command -v lazygit &>/dev/null; then
+    HAS_LAZYGIT=true
+fi
+
+show_header() {
+    clear
+    echo -e "${PURPLE}${BOLD}workbench${NC} ${DIM}·${NC} ${CYAN}$BRANCH${NC}"
+    echo -e "${DIM}$(date +%H:%M:%S) · $WORKTREE${NC}"
+    echo ""
+}
+
+show_diff_stat() {
+    local stat
+    stat="$(cd "$WORKTREE" && git diff --stat --color HEAD 2>/dev/null)"
+
+    if [[ -z "$stat" ]]; then
+        echo -e "${DIM}  No changes yet${NC}"
+    else
+        echo "$stat" | while IFS= read -r line; do
+            echo "  $line"
+        done
+    fi
+}
+
+show_untracked() {
+    local untracked
+    untracked="$(cd "$WORKTREE" && git ls-files --others --exclude-standard 2>/dev/null)"
+
+    if [[ -n "$untracked" ]]; then
+        echo ""
+        echo -e "  ${YELLOW}Untracked:${NC}"
+        echo "$untracked" | while IFS= read -r f; do
+            echo -e "    ${DIM}? $f${NC}"
+        done
+    fi
+}
+
+show_controls() {
+    echo ""
+    echo -e "${DIM}  ─────────────────────────────────${NC}"
+    if [[ "$HAS_FZF" == true ]]; then
+        echo -e "  ${CYAN}f${NC} file picker    ${CYAN}d${NC} full diff    ${CYAN}e${NC} editor"
+    fi
+    if [[ "$HAS_LAZYGIT" == true ]]; then
+        echo -e "  ${CYAN}g${NC} lazygit       ${CYAN}s${NC} stage all    ${CYAN}c${NC} commit"
+    fi
+    echo -e "  ${CYAN}r${NC} refresh       ${CYAN}q${NC} quit"
+}
+
+# Interactive file picker using fzf
+pick_file_diff() {
+    local files
+    files="$(cd "$WORKTREE" && git diff --name-only HEAD 2>/dev/null)"
+
+    if [[ -z "$files" ]]; then
+        echo -e "${DIM}No changed files${NC}"
+        sleep 1
+        return
+    fi
+
+    local selected
+    if [[ "$HAS_FZF" == true ]]; then
+        selected="$(echo "$files" | fzf \
+            --preview "cd '$WORKTREE' && git diff HEAD -- {} $(command -v delta &>/dev/null && echo '| delta' || echo '--color')" \
+            --preview-window=right:60%:wrap \
+            --header="Select file for diff (ESC to cancel)" \
+            --border \
+            --height=80% \
+            2>/dev/null)" || return 0
+
+        if [[ -n "$selected" ]]; then
+            # Show full diff in a floating Zellij pane if available
+            if [[ -n "${ZELLIJ:-}" ]]; then
+                if command -v delta &>/dev/null; then
+                    zellij run --floating --name "diff: $selected" -- \
+                        bash -c "cd '$WORKTREE' && git diff HEAD -- '$selected' | delta --paging always"
+                else
+                    zellij run --floating --name "diff: $selected" -- \
+                        bash -c "cd '$WORKTREE' && git diff HEAD --color -- '$selected' | less -R"
+                fi
+            else
+                # Fallback: show in current terminal
+                cd "$WORKTREE" && eval "$DIFF_CMD HEAD -- '$selected'" | less -R
+            fi
+        fi
+    fi
+}
+
+show_full_diff() {
+    if [[ -n "${ZELLIJ:-}" ]]; then
+        if command -v delta &>/dev/null; then
+            zellij run --floating --name "full diff" -- \
+                bash -c "cd '$WORKTREE' && git diff HEAD | delta --paging always"
+        else
+            zellij run --floating --name "full diff" -- \
+                bash -c "cd '$WORKTREE' && git diff HEAD --color | less -R"
+        fi
+    else
+        cd "$WORKTREE" && eval "$DIFF_CMD HEAD" | less -R
+    fi
+}
+
+open_editor() {
+    local editor="${EDITOR:-${VISUAL:-vim}}"
+    if [[ -n "${ZELLIJ:-}" ]]; then
+        zellij run --floating --name "editor" -- bash -c "cd '$WORKTREE' && $editor ."
+    else
+        cd "$WORKTREE" && $editor .
+    fi
+}
+
+open_lazygit() {
+    if [[ -n "${ZELLIJ:-}" ]]; then
+        zellij run --floating --name "lazygit" -- bash -c "cd '$WORKTREE' && lazygit"
+    else
+        cd "$WORKTREE" && lazygit
+    fi
+}
+
+stage_all() {
+    cd "$WORKTREE" && git add -A
+    echo -e "${GREEN}  ✓ Staged all changes${NC}"
+    sleep 1
+}
+
+do_commit() {
+    cd "$WORKTREE"
+    echo -ne "  ${CYAN}Commit message: ${NC}"
+    read -r msg
+    if [[ -n "$msg" ]]; then
+        git add -A && git commit -m "$msg"
+        echo -e "${GREEN}  ✓ Committed${NC}"
+    else
+        echo -e "${YELLOW}  Cancelled${NC}"
+    fi
+    sleep 1
+}
+
+# --- Main loop ---
+PURPLE='\033[0;35m'
+
+while true; do
+    show_header
+    show_diff_stat
+    show_untracked
+    show_controls
+
+    # Read a single key with timeout (auto-refresh every 3s)
+    if read -rsn1 -t 3 key; then
+        case "$key" in
+            f) pick_file_diff ;;
+            d) show_full_diff ;;
+            e) open_editor ;;
+            g) [[ "$HAS_LAZYGIT" == true ]] && open_lazygit ;;
+            s) stage_all ;;
+            c) do_commit ;;
+            r) ;; # refresh
+            q) exit 0 ;;
+        esac
+    fi
+done
