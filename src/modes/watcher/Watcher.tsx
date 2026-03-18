@@ -3,7 +3,7 @@ import { createRoot, useKeyboard } from "@opentui/react"
 import { useState, useRef, useEffect } from "react"
 
 import { readState, type TaskState } from "../../lib/state"
-import { isInsideCmux, splitPane, sendText } from "../../lib/cmux"
+import { isInsideCmux, splitPaneWithIds, createSurfaceInPane, sendText, waitForSurface } from "../../lib/cmux"
 import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
 import { getChangedFiles } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
@@ -36,13 +36,34 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
   const hasLazygit = Bun.spawnSync(["which", "lazygit"]).exitCode === 0
   const hasDelta = Bun.spawnSync(["which", "delta"]).exitCode === 0
 
-  /** Open a command in a new cmux split pane (pane closes when command exits) */
-  const openInPane = (cmd: string) => {
-    if (isInsideCmux()) {
-      splitPane("right").then((surfaceId) => {
-        if (surfaceId) sendText(`${cmd}; exit\n`, surfaceId)
-      })
+  // Track the bottom pane so subsequent shortcuts open new tabs instead of new panes
+  const bottomPaneId = useRef<string | null>(null)
+
+  /** Open a command in the bottom pane, creating it if needed. Surface closes when command exits. */
+  const openInBottomPane = async (cmd: string) => {
+    if (!isInsideCmux()) return
+
+    let surfaceId: string | null = null
+
+    if (bottomPaneId.current) {
+      // Try to add a new tab in the existing bottom pane
+      surfaceId = await createSurfaceInPane(bottomPaneId.current)
+      if (!surfaceId) {
+        // Pane was closed by the user — reset and fall through to re-create
+        bottomPaneId.current = null
+      }
     }
+
+    if (!surfaceId) {
+      // No bottom pane yet (or it was closed): split down
+      const result = await splitPaneWithIds("down")
+      if (!result) return
+      surfaceId = result.surfaceId
+      bottomPaneId.current = result.paneId
+    }
+
+    await waitForSurface(surfaceId)
+    await sendText(`${cmd}; exit\n`, surfaceId)
   }
 
   useKeyboard((key) => {
@@ -55,7 +76,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
               ? `git diff HEAD -- {} | delta --paging always`
               : `git diff HEAD --color -- {} | less -R`
             const cmd = `cd '${worktree}' && git diff --name-only HEAD | fzf --preview '${diffCmd}' --preview-window=right:60%:wrap --header='Select file (ESC to cancel)'`
-            openInPane(cmd)
+            openInBottomPane(cmd)
           }
         }
         break
@@ -64,18 +85,18 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           const diffCmd = hasDelta
             ? `cd '${worktree}' && git diff HEAD | delta --paging always`
             : `cd '${worktree}' && git diff HEAD --color | less -R`
-          openInPane(diffCmd)
+          openInBottomPane(diffCmd)
         }
         break
       case "e":
         if (isInsideCmux()) {
           const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vim"
-          openInPane(`cd '${worktree}' && ${editor} .`)
+          openInBottomPane(`cd '${worktree}' && ${editor} .`)
         }
         break
       case "g":
         if (hasLazygit && isInsideCmux()) {
-          openInPane(`cd '${worktree}' && lazygit`)
+          openInBottomPane(`cd '${worktree}' && lazygit`)
         }
         break
       case "s":
@@ -83,14 +104,13 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         break
       case "c":
         if (isInsideCmux()) {
-          openInPane(
+          openInBottomPane(
             `cd '${worktree}' && git add -A && echo 'Enter commit message:' && read -r msg && git commit -m "$msg"`,
           )
         }
         break
       case "q":
         exitTui(0)
-        break
     }
   })
 

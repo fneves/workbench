@@ -108,6 +108,25 @@ export async function splitPane(direction: "right" | "left" | "up" | "down" = "r
   return res.result?.surface_id ?? null
 }
 
+/** Split and return both surface and pane IDs. */
+export async function splitPaneWithIds(
+  direction: "right" | "left" | "up" | "down" = "right",
+): Promise<{ surfaceId: string; paneId: string } | null> {
+  const res = await cmuxRequest("surface.split", { direction })
+  if (!res?.ok) return null
+  const surfaceId = res.result?.surface_id
+  const paneId = res.result?.pane_id
+  if (!surfaceId || !paneId) return null
+  return { surfaceId, paneId }
+}
+
+/** Create a new tab (surface) inside an existing pane. */
+export async function createSurfaceInPane(paneId: string): Promise<string | null> {
+  const res = await cmuxRequest("surface.create", { pane_id: paneId })
+  if (!res?.ok) return null
+  return res.result?.surface_id ?? null
+}
+
 export async function closeSurface(surfaceId: string): Promise<boolean> {
   const res = await cmuxRequest("surface.close", { surface_id: surfaceId })
   return res?.ok ?? false
