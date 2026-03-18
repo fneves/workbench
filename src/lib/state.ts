@@ -18,6 +18,7 @@ export interface TaskState {
   updated_at: string
   pid: number | null
   cmux_workspace_id: string | null
+  cmux_agent_surface_id: string | null
 }
 
 export async function readState(branch: string): Promise<TaskState | null> {
@@ -83,6 +84,7 @@ export function newTaskState(opts: {
     updated_at: now,
     pid: null,
     cmux_workspace_id: null,
+    cmux_agent_surface_id: null,
   }
 }
 
@@ -143,6 +145,7 @@ export async function reconcileWorktrees(): Promise<void> {
         updated_at: now,
         pid: null,
         cmux_workspace_id: null,
+        cmux_agent_surface_id: null,
       }
       await writeState(branch, state)
     }

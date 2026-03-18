@@ -195,6 +195,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   const defaultSurface = surfaces.find((s) => s.type === "terminal")
   if (defaultSurface) {
     await waitForSurface(defaultSurface.id)
+    await updateState(branch, { cmux_agent_surface_id: defaultSurface.id })
   }
 
   // Send the agent wrapper command to the new workspace's terminal
