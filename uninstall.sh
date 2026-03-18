@@ -9,18 +9,19 @@ NC='\033[0m'
 
 INSTALL_DIR="${WORKBENCH_INSTALL_DIR:-$HOME/.local/bin}"
 
-BINS=(workbench wb-status wb-spawn wb-watch wb-cleanup wb-notify)
+# Remove new single binary
+BINS=(workbench)
+# Also clean up old script symlinks if they exist
+OLD_BINS=(wb-status wb-spawn wb-watch wb-cleanup wb-notify)
 
 echo -e "${PURPLE:-\033[0;35m}${BOLD}⚡ workbench uninstaller${NC}"
 echo ""
 
-for name in "${BINS[@]}"; do
+for name in "${BINS[@]}" "${OLD_BINS[@]}"; do
     target="$INSTALL_DIR/$name"
-    if [[ -L "$target" ]]; then
+    if [[ -L "$target" ]] || [[ -f "$target" ]]; then
         rm "$target"
         echo -e "  ${RED}✗${NC} removed $target"
-    elif [[ -f "$target" ]]; then
-        echo -e "  ${YELLOW}!${NC} $target exists but is not a symlink, skipping"
     fi
 done
 
