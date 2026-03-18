@@ -6,7 +6,7 @@ import { resolve } from "path"
 import { notify } from "../../lib/notify"
 import { isInsideCmux, selectWorkspace } from "../../lib/cmux"
 import { getScriptDir } from "../../lib/config"
-import { exitTui, installTuiCleanup } from "../../lib/tui"
+import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
 import { reconcileWorktrees } from "../../lib/state"
 
 import { useTaskState } from "../../hooks/useTaskState"
@@ -140,7 +140,6 @@ function Dashboard() {
     switch (key.name) {
       case "q":
         exitTui(0)
-        break
       case "n":
         if (!pendingOp) setShowSpawn(true)
         break
@@ -209,7 +208,8 @@ function Dashboard() {
 }
 
 export async function runDashboard(): Promise<void> {
-  installTuiCleanup()
   const renderer = await createCliRenderer()
+  registerTuiRenderer(renderer)
+  installTuiCleanup()
   createRoot(renderer).render(<Dashboard />)
 }

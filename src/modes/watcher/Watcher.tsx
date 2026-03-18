@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 
 import { readState, type TaskState } from "../../lib/state"
 import { isInsideCmux, splitPane, sendText } from "../../lib/cmux"
-import { exitTui, installTuiCleanup } from "../../lib/tui"
+import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
 import { getChangedFiles } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
 
@@ -142,7 +142,8 @@ export async function runWatcher(worktree: string, branch: string): Promise<void
     branch = basename(worktree)
   }
 
-  installTuiCleanup()
   const renderer = await createCliRenderer()
+  registerTuiRenderer(renderer)
+  installTuiCleanup()
   createRoot(renderer).render(<WatcherApp worktree={worktree} branch={branch} />)
 }

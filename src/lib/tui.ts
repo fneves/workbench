@@ -1,3 +1,5 @@
+import type { CliRenderer } from "@opentui/core"
+
 const RESET_SEQUENCES =
   "\x1b[?1000l" + // disable normal mouse tracking
   "\x1b[?1002l" + // disable button-event tracking
@@ -9,10 +11,21 @@ const RESET_SEQUENCES =
   "\x1b[0m"       // reset all attributes
 
 let tuiCleaned = false
+let registeredRenderer: CliRenderer | null = null
+
+/** Register the OpenTUI renderer so exitTui can call its native teardown. */
+export function registerTuiRenderer(renderer: CliRenderer): void {
+  registeredRenderer = renderer
+}
 
 function doCleanup(): void {
   if (tuiCleaned) return
   tuiCleaned = true
+  // Force OpenTUI's native teardown (disables mouse, restores screen, etc.)
+  // finalizeDestroy bypasses the `rendering` guard that destroy() has.
+  if (registeredRenderer) {
+    try { (registeredRenderer as any).finalizeDestroy?.() } catch {}
+  }
   try { if ((process.stdin as any).setRawMode) (process.stdin as any).setRawMode(false) } catch {}
   try { process.stdin.pause() } catch {}
   process.stdout.write(RESET_SEQUENCES)
