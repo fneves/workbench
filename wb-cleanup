@@ -1,5 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
+setopt nullglob
 
 WORKBENCH_STATE_DIR="/tmp/workbench"
 
@@ -15,7 +16,13 @@ REPO_ROOT="$(cat "$WORKBENCH_STATE_DIR/.repo" 2>/dev/null || git rev-parse --sho
 cleanup_task() {
     local branch="$1"
     local state_file="$WORKBENCH_STATE_DIR/$branch.json"
-    local worktree="$REPO_ROOT/.worktrees/$branch"
+    local worktree
+    worktree="$(jq -r '.worktree // empty' "$state_file" 2>/dev/null)"
+    if [[ -z "$worktree" ]]; then
+        local repo_name
+        repo_name="$(basename "$REPO_ROOT")"
+        worktree="$REPO_ROOT/../.workbench-worktrees/$repo_name/$branch"
+    fi
     local wrapper="$WORKBENCH_STATE_DIR/$branch.run.sh"
 
     echo -e "${YELLOW}Cleaning up: $branch${NC}"

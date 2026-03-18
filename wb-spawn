@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
 
 WORKBENCH_STATE_DIR="/tmp/workbench"
@@ -54,9 +54,10 @@ fi
 
 # Resolve paths
 REPO_ROOT="$(cat "$WORKBENCH_STATE_DIR/.repo" 2>/dev/null || git rev-parse --show-toplevel)"
-WORKTREE_DIR="$REPO_ROOT/.worktrees/$BRANCH"
+REPO_NAME="$(basename "$REPO_ROOT")"
+WORKTREE_DIR="$REPO_ROOT/../.workbench-worktrees/$REPO_NAME/$BRANCH"
 STATE_FILE="$WORKBENCH_STATE_DIR/$BRANCH.json"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${0}" 2>/dev/null || realpath "${0}")")" && pwd)"
 LAYOUTS_DIR="$WORKBENCH_STATE_DIR/layouts"
 
 mkdir -p "$LAYOUTS_DIR"
@@ -69,7 +70,7 @@ if [[ "$MODE" == "worktree" ]]; then
         echo -e "${YELLOW}Worktree already exists: $WORKTREE_DIR${NC}"
     else
         echo -e "${GREEN}Creating worktree: $BRANCH (from $BASE_BRANCH)${NC}"
-        mkdir -p "$REPO_ROOT/.worktrees"
+        mkdir -p "$(dirname "$WORKTREE_DIR")"
         git -C "$REPO_ROOT" worktree add "$WORKTREE_DIR" -b "$BRANCH" "$BASE_BRANCH" 2>/dev/null || \
         git -C "$REPO_ROOT" worktree add "$WORKTREE_DIR" "$BRANCH" 2>/dev/null || {
             echo -e "${RED}Failed to create worktree${NC}"
@@ -79,7 +80,7 @@ if [[ "$MODE" == "worktree" ]]; then
 elif [[ "$MODE" == "container" ]]; then
     echo -e "${YELLOW}Container mode — setting up worktree + devcontainer: $BRANCH${NC}"
     if [[ ! -d "$WORKTREE_DIR" ]]; then
-        mkdir -p "$REPO_ROOT/.worktrees"
+        mkdir -p "$(dirname "$WORKTREE_DIR")"
         git -C "$REPO_ROOT" worktree add "$WORKTREE_DIR" -b "$BRANCH" "$BASE_BRANCH" 2>/dev/null || \
         git -C "$REPO_ROOT" worktree add "$WORKTREE_DIR" "$BRANCH"
     fi
@@ -111,7 +112,7 @@ EOF
 # ============================================================
 WRAPPER_FILE="$WORKBENCH_STATE_DIR/$BRANCH.run.sh"
 cat > "$WRAPPER_FILE" <<'WRAPPER_HEADER'
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -uo pipefail
 WRAPPER_HEADER
 
@@ -226,7 +227,7 @@ fi
 
 echo ""
 echo -e "\033[2mAgent exited ($EXIT_CODE). You're still in the worktree. Ctrl+D to close.\033[0m"
-exec bash --norc --noprofile
+exec zsh
 WRAPPER_FOOTER
 
 chmod +x "$WRAPPER_FILE"
@@ -236,7 +237,7 @@ chmod +x "$WRAPPER_FILE"
 # ============================================================
 WATCHER_FILE="$WORKBENCH_STATE_DIR/$BRANCH.watch.sh"
 cat > "$WATCHER_FILE" <<WATCHER
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 exec "$SCRIPT_DIR/wb-watch" "$WORKTREE_DIR" "$BRANCH"
 WATCHER
 chmod +x "$WATCHER_FILE"
@@ -251,11 +252,11 @@ if [[ "$MODE" == "container" ]]; then
     cat > "$TASK_LAYOUT" <<KDL
 layout {
     pane split_direction="vertical" {
-        pane size="60%" name="agent" focus=true command="bash" {
-            args "-c" "echo 'Starting devcontainer for $BRANCH...'; cd '$WORKTREE_DIR' && devcontainer up --workspace-folder . && devcontainer exec --workspace-folder . bash '$WRAPPER_FILE'; exec bash"
+        pane size="60%" name="agent" focus=true command="zsh" {
+            args "-c" "echo 'Starting devcontainer for $BRANCH...'; cd '$WORKTREE_DIR' && devcontainer up --workspace-folder . && devcontainer exec --workspace-folder . zsh '$WRAPPER_FILE'; exec zsh"
         }
-        pane size="40%" name="watcher" command="bash" {
-            args "-c" "exec bash '$WATCHER_FILE'"
+        pane size="40%" name="watcher" command="zsh" {
+            args "-c" "exec zsh '$WATCHER_FILE'"
         }
     }
 }
@@ -265,11 +266,11 @@ else
     cat > "$TASK_LAYOUT" <<KDL
 layout {
     pane split_direction="vertical" {
-        pane size="60%" name="agent" focus=true command="bash" {
-            args "-c" "exec bash '$WRAPPER_FILE'"
+        pane size="60%" name="agent" focus=true command="zsh" {
+            args "-c" "exec zsh '$WRAPPER_FILE'"
         }
-        pane size="40%" name="watcher" command="bash" {
-            args "-c" "exec bash '$WATCHER_FILE'"
+        pane size="40%" name="watcher" command="zsh" {
+            args "-c" "exec zsh '$WATCHER_FILE'"
         }
     }
 }

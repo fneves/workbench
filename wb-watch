@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
 
 # wb-watch: File change watcher for a worktree
@@ -44,7 +44,7 @@ STATE_FILE="/tmp/workbench/$BRANCH.json"
 LAST_AGENT_STATUS=""
 
 SPINNER_FRAMES=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
-TICK=0
+TICK=1
 
 get_agent_status() {
     if [[ -f "$STATE_FILE" ]]; then
@@ -59,7 +59,7 @@ show_header() {
     local cols
     cols=$(tput cols 2>/dev/null || echo 80)
 
-    TICK=$(( (TICK + 1) % ${#SPINNER_FRAMES[@]} ))
+    TICK=$(( (TICK % ${#SPINNER_FRAMES[@]}) + 1 ))
     local agent_status
     agent_status="$(get_agent_status)"
 

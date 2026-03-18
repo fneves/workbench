@@ -1,11 +1,12 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
+setopt nullglob
 
 # wb-status: Orchestrator TUI dashboard with visual notifications
 # Shows all active tasks with live diff stats, an alert bar, and event log
 
 WORKBENCH_STATE_DIR="/tmp/workbench"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${0}" 2>/dev/null || realpath "${0}")")" && pwd)"
 
 # ── Colors ──────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -46,7 +47,7 @@ ALERT_FLASH=false   # whether to blink the bar
 
 # Spinner frames for running tasks
 SPINNER_FRAMES=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
-TICK=0
+TICK=1
 
 # ── Helpers ─────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ render() {
     cols=$(tput cols 2>/dev/null || echo 80)
     rows=$(tput lines 2>/dev/null || echo 24)
 
-    TICK=$(( (TICK + 1) % ${#SPINNER_FRAMES[@]} ))
+    TICK=$(( (TICK % ${#SPINNER_FRAMES[@]}) + 1 ))
     local spinner="${SPINNER_FRAMES[$TICK]}"
     local now
     now=$(date +%s)

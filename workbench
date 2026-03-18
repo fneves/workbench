@@ -1,10 +1,11 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
+setopt nullglob
 
 WORKBENCH_DIR="${WORKBENCH_DIR:-$HOME/.workbench}"
 WORKBENCH_SESSION="workbench"
 WORKBENCH_STATE_DIR="/tmp/workbench"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${0}" 2>/dev/null || realpath "${0}")")" && pwd)"
 
 # Colors
 RED='\033[0;31m'
@@ -67,9 +68,8 @@ cmd_start() {
     else
         echo -e "${GREEN}Starting new session...${NC}"
         # Launch Zellij with the orchestrator as the first tab
-        zellij --session "$WORKBENCH_SESSION" \
-            --layout "$SCRIPT_DIR/../layouts/orchestrator.kdl" \
-            options --default-shell bash
+        zellij -s "$WORKBENCH_SESSION" \
+            -n "$SCRIPT_DIR/layouts/orchestrator.kdl"
     fi
 }
 

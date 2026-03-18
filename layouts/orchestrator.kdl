@@ -7,8 +7,8 @@ layout {
     }
 
     tab name="⚡ orchestrator" focus=true {
-        pane command="bash" {
-            args "-c" "wb-status || echo 'wb-status not found in PATH. Run it manually.'; exec bash"
+        pane command="zsh" {
+            args "-c" "wb-status || echo 'wb-status not found in PATH. Run it manually.'; exec zsh"
         }
     }
 }

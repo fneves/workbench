@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -9,8 +9,11 @@ DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="${1:-$HOME/.local/bin}"
+SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+INSTALL_DIR="${WORKBENCH_INSTALL_DIR:-$HOME/.local/bin}"
+
+# Scripts to install (relative to repo root)
+BINS=(workbench wb-status wb-spawn wb-watch wb-cleanup wb-notify)
 
 echo -e "${PURPLE:-\033[0;35m}${BOLD}⚡ workbench installer${NC}"
 echo ""
@@ -46,8 +49,11 @@ check_dep "opencode" false            # OpenCode CLI
 check_dep "fzf" false                 # Fuzzy finder
 check_dep "delta" false               # Better diffs
 check_dep "lazygit" false             # Git TUI
-check_dep "terminal-notifier" false   # Desktop notifications (macOS)
-check_dep "notify-send" false         # Desktop notifications (Linux)
+if [[ "$(uname)" == "Darwin" ]]; then
+    check_dep "terminal-notifier" false   # Desktop notifications (macOS)
+else
+    check_dep "notify-send" false         # Desktop notifications (Linux)
+fi
 
 if [[ "$MISSING" == true ]]; then
     echo ""
@@ -67,13 +73,18 @@ echo ""
 echo -e "${BOLD}Installing to $INSTALL_DIR...${NC}"
 mkdir -p "$INSTALL_DIR"
 
-for bin in "$SCRIPT_DIR/bin/"*; do
-    name="$(basename "$bin")"
+for name in "${BINS[@]}"; do
+    src="$SCRIPT_DIR/$name"
     target="$INSTALL_DIR/$name"
+    if [[ ! -f "$src" ]]; then
+        echo -e "  ${YELLOW}○${NC} $name ${DIM}(not found, skipping)${NC}"
+        continue
+    fi
+    chmod +x "$src"
     if [[ -L "$target" ]] || [[ -f "$target" ]]; then
         rm "$target"
     fi
-    ln -s "$bin" "$target"
+    ln -s "$src" "$target"
     echo -e "  ${GREEN}→${NC} $name"
 done
 
@@ -93,3 +104,5 @@ echo -e "  ${CYAN}workbench start${NC}   — launch the orchestrator"
 echo -e "  ${CYAN}workbench spawn${NC}   — spawn a task"
 echo -e "  ${CYAN}workbench list${NC}    — list tasks"
 echo -e "  ${CYAN}workbench --help${NC}  — full usage"
+echo ""
+echo -e "  ${DIM}To uninstall: ./uninstall.sh${NC}"
