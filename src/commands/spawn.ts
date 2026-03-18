@@ -16,7 +16,6 @@ import {
   selectWorkspace,
   splitPane,
   sendText,
-  currentWorkspaceId,
   listSurfaces,
   waitForSurface,
 } from "../lib/cmux"
@@ -172,9 +171,6 @@ export async function cmdSpawn(args: string[]): Promise<void> {
     return
   }
 
-  // Remember which workspace we're in (the dashboard) so we can return after spawn
-  const dashboardWsId = currentWorkspaceId()
-
   // Create a new workspace for this task
   const wsName = branch
   console.log(`${C.green}Creating cmux workspace: ${wsName}${C.nc}`)
@@ -213,11 +209,6 @@ export async function cmdSpawn(args: string[]): Promise<void> {
     // Wait for the new pane's shell to be ready before sending the command
     await waitForSurface(watcherSurfaceId)
     await sendText(`${bunPath} run ${entryPoint} watcher '${worktreeDir}' '${branch}'\n`, watcherSurfaceId)
-  }
-
-  // Return focus to the dashboard workspace
-  if (dashboardWsId) {
-    await selectWorkspace(dashboardWsId)
   }
 
   console.log()

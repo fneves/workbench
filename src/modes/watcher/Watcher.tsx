@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 
 import { readState, type TaskState } from "../../lib/state"
 import { isInsideCmux, splitPane, sendText } from "../../lib/cmux"
-import { exitTui } from "../../lib/tui"
+import { exitTui, installTuiCleanup } from "../../lib/tui"
 import { getChangedFiles } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
 
@@ -36,11 +36,11 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
   const hasLazygit = Bun.spawnSync(["which", "lazygit"]).exitCode === 0
   const hasDelta = Bun.spawnSync(["which", "delta"]).exitCode === 0
 
-  /** Open a command in a new cmux split pane */
+  /** Open a command in a new cmux split pane (pane closes when command exits) */
   const openInPane = (cmd: string) => {
     if (isInsideCmux()) {
       splitPane("right").then((surfaceId) => {
-        if (surfaceId) sendText(`${cmd}\n`, surfaceId)
+        if (surfaceId) sendText(`${cmd}; exit\n`, surfaceId)
       })
     }
   }
@@ -142,6 +142,7 @@ export async function runWatcher(worktree: string, branch: string): Promise<void
     branch = basename(worktree)
   }
 
+  installTuiCleanup()
   const renderer = await createCliRenderer()
   createRoot(renderer).render(<WatcherApp worktree={worktree} branch={branch} />)
 }

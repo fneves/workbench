@@ -6,7 +6,7 @@ import { resolve } from "path"
 import { notify } from "../../lib/notify"
 import { isInsideCmux, selectWorkspace } from "../../lib/cmux"
 import { getScriptDir } from "../../lib/config"
-import { exitTui } from "../../lib/tui"
+import { exitTui, installTuiCleanup } from "../../lib/tui"
 import { reconcileWorktrees } from "../../lib/state"
 
 import { useTaskState } from "../../hooks/useTaskState"
@@ -104,7 +104,8 @@ function Dashboard() {
         pushEvent("+", `Spawned ${opts.branch} (${opts.agent}, ${opts.mode})`)
         setAlert(`✓ Spawned ${opts.branch}`, "#3b82f6", 4, false)
       } else {
-        pushEvent("✗", `Failed to spawn ${opts.branch}`)
+        const errMsg = result.stderr.trim().split("\n").pop() ?? "unknown error"
+        pushEvent("✗", `Failed: ${errMsg}`)
         setAlert(`✗ Failed to spawn ${opts.branch}`, "#ef4444", 6, false)
       }
     },
@@ -121,7 +122,8 @@ function Dashboard() {
         pushEvent("×", `Killed ${branch}`)
         setAlert(`× Killed ${branch}`, "#ef4444", 3, false)
       } else {
-        pushEvent("✗", `Failed to kill ${branch}`)
+        const errMsg = result.stderr.trim().split("\n").pop() ?? "unknown error"
+        pushEvent("✗", `Kill failed: ${errMsg}`)
         setAlert(`✗ Failed to kill ${branch}`, "#ef4444", 4, false)
       }
       setSelected(0)
@@ -207,6 +209,7 @@ function Dashboard() {
 }
 
 export async function runDashboard(): Promise<void> {
+  installTuiCleanup()
   const renderer = await createCliRenderer()
   createRoot(renderer).render(<Dashboard />)
 }

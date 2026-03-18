@@ -1,10 +1,8 @@
 import { mkdirSync, writeFileSync } from "fs"
-import { resolve } from "path"
 import {
   WORKBENCH_DIR,
   WORKBENCH_STATE_DIR,
   getRepoRoot,
-  getScriptDir,
 } from "../lib/config"
 import { reconcileWorktrees } from "../lib/state"
 import { isInsideCmux } from "../lib/cmux"
@@ -41,15 +39,8 @@ export async function cmdStart(): Promise<void> {
     process.exit(1)
   }
 
-  // Launch the dashboard in the current pane (no new workspace created)
-  const scriptDir = getScriptDir()
-  const entryPoint = resolve(scriptDir, "src/index.tsx")
-  const bunPath = Bun.which("bun") ?? "bun"
-
+  // Launch the dashboard directly in this process
   console.log(`${C.green}Launching dashboard...${C.nc}`)
-  const proc = Bun.spawnSync([bunPath, "run", entryPoint, "dashboard"], {
-    stdio: ["inherit", "inherit", "inherit"],
-    env: { ...process.env },
-  })
-  process.exit(proc.exitCode ?? 0)
+  const { runDashboard } = await import("../modes/dashboard/Dashboard")
+  await runDashboard()
 }
