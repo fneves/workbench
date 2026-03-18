@@ -41,19 +41,20 @@ check_dep "bash" || MISSING=true
 
 echo ""
 echo -e "${BOLD}Optional tools:${NC}"
-check_dep "claude" false      # Claude Code CLI
-check_dep "opencode" false    # OpenCode CLI
-check_dep "fzf" false         # Fuzzy finder
-check_dep "delta" false       # Better diffs
-check_dep "lazygit" false     # Git TUI
-check_dep "notify-send" false # Desktop notifications (Linux)
+check_dep "claude" false              # Claude Code CLI
+check_dep "opencode" false            # OpenCode CLI
+check_dep "fzf" false                 # Fuzzy finder
+check_dep "delta" false               # Better diffs
+check_dep "lazygit" false             # Git TUI
+check_dep "terminal-notifier" false   # Desktop notifications (macOS)
+check_dep "notify-send" false         # Desktop notifications (Linux)
 
 if [[ "$MISSING" == true ]]; then
     echo ""
     echo -e "${RED}Missing required dependencies. Install them first.${NC}"
     echo ""
     echo -e "  ${DIM}# macOS${NC}"
-    echo -e "  brew install zellij jq fzf git-delta lazygit"
+    echo -e "  brew install zellij jq fzf git-delta lazygit terminal-notifier"
     echo ""
     echo -e "  ${DIM}# Linux${NC}"
     echo -e "  # See https://zellij.dev/documentation/installation${NC}"

@@ -35,10 +35,87 @@ if command -v lazygit &>/dev/null; then
     HAS_LAZYGIT=true
 fi
 
+PURPLE='\033[0;35m'
+BG_GREEN='\033[42m'
+BG_YELLOW='\033[43m'
+BG_RED='\033[41m'
+FG_BLACK='\033[30m'
+STATE_FILE="/tmp/workbench/$BRANCH.json"
+LAST_AGENT_STATUS=""
+
+SPINNER_FRAMES=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+TICK=0
+
+get_agent_status() {
+    if [[ -f "$STATE_FILE" ]]; then
+        jq -r '.status // "unknown"' "$STATE_FILE" 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
 show_header() {
     clear
-    echo -e "${PURPLE}${BOLD}workbench${NC} ${DIM}·${NC} ${CYAN}$BRANCH${NC}"
-    echo -e "${DIM}$(date +%H:%M:%S) · $WORKTREE${NC}"
+    local cols
+    cols=$(tput cols 2>/dev/null || echo 80)
+
+    TICK=$(( (TICK + 1) % ${#SPINNER_FRAMES[@]} ))
+    local agent_status
+    agent_status="$(get_agent_status)"
+
+    # ── Agent status bar (full-width colored strip) ────
+    local bar_icon bar_label bar_bg
+    case "$agent_status" in
+        running)
+            bar_icon="${SPINNER_FRAMES[$TICK]}"
+            bar_label="Agent running"
+            bar_bg="$BG_GREEN"
+            ;;
+        prompting)
+            bar_icon="◉"
+            bar_label="AGENT NEEDS INPUT — switch to agent pane"
+            bar_bg="$BG_YELLOW"
+            ;;
+        done)
+            bar_icon="✓"
+            bar_label="Agent finished — review changes below"
+            bar_bg="$BG_GREEN"
+            ;;
+        failed)
+            bar_icon="✗"
+            bar_label="Agent failed"
+            bar_bg="$BG_RED"
+            ;;
+        starting)
+            bar_icon="◔"
+            bar_label="Agent starting..."
+            bar_bg="$BG_GREEN"
+            ;;
+        *)
+            bar_icon="?"
+            bar_label="Agent: $agent_status"
+            bar_bg=""
+            ;;
+    esac
+
+    # Bell on transition
+    if [[ "$agent_status" != "$LAST_AGENT_STATUS" ]] && [[ -n "$LAST_AGENT_STATUS" ]]; then
+        case "$agent_status" in
+            done|prompting|failed) printf "\a" ;;
+        esac
+    fi
+    LAST_AGENT_STATUS="$agent_status"
+
+    # Render the bar
+    if [[ -n "$bar_bg" ]]; then
+        local bar_text="  ${bar_icon} ${bar_label}"
+        local padding=$(( cols - ${#bar_text} ))
+        [[ $padding -lt 0 ]] && padding=0
+        printf "${bar_bg}${FG_BLACK}${BOLD}  %s %s%*s${NC}\n" "$bar_icon" "$bar_label" "$padding" ""
+    fi
+
+    echo -e "  ${PURPLE}${BOLD}watcher${NC} ${DIM}·${NC} ${CYAN}$BRANCH${NC}"
+    echo -e "  ${DIM}$(date +%H:%M:%S) · $WORKTREE${NC}"
     echo ""
 }
 
@@ -170,16 +247,14 @@ do_commit() {
 }
 
 # --- Main loop ---
-PURPLE='\033[0;35m'
-
 while true; do
     show_header
     show_diff_stat
     show_untracked
     show_controls
 
-    # Read a single key with timeout (auto-refresh every 3s)
-    if read -rsn1 -t 3 key; then
+    # Read a single key with timeout (1s refresh for smooth spinner)
+    if read -rsn1 -t 1 key; then
         case "$key" in
             f) pick_file_diff ;;
             d) show_full_diff ;;

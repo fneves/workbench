@@ -149,13 +149,23 @@ update_diff_stats() {
 }
 
 notify() {
-    local title="$1" body="$2"
-    if command -v notify-send &>/dev/null; then
-        notify-send "$title" "$body"
+    local title="$1" body="$2" sound="${3:-default}"
+    # Use the shared wb-notify helper if in PATH, otherwise inline fallback
+    if command -v wb-notify &>/dev/null; then
+        wb-notify "$title" "$body" "$sound" "workbench-$BRANCH" &
+    elif command -v terminal-notifier &>/dev/null; then
+        terminal-notifier \
+            -title "$title" \
+            -message "$body" \
+            -group "workbench-$BRANCH" \
+            -sound "$sound" \
+            2>/dev/null &
     elif command -v osascript &>/dev/null; then
-        osascript -e "display notification \"$body\" with title \"$title\""
+        osascript -e "display notification \"$body\" with title \"$title\" sound name \"$sound\"" 2>/dev/null &
+    elif command -v notify-send &>/dev/null; then
+        notify-send --urgency=normal --app-name="workbench" "$title" "$body" 2>/dev/null &
     fi
-    printf "\a"  # terminal bell
+    printf "\a"
 }
 
 # --- Background diff stat updater (every 3s) ---
@@ -208,10 +218,10 @@ update_diff_stats
 
 if [[ $EXIT_CODE -eq 0 ]]; then
     update_state "status" "done"
-    notify "✓ $BRANCH" "Agent finished successfully"
+    notify "✓ $BRANCH" "Agent finished successfully" "Glass"
 else
     update_state "status" "failed"
-    notify "✗ $BRANCH" "Agent exited with code $EXIT_CODE"
+    notify "✗ $BRANCH" "Agent exited with code $EXIT_CODE" "Basso"
 fi
 
 echo ""
