@@ -7,6 +7,7 @@ import { notify } from "../../lib/notify"
 import { isInsideCmux, selectWorkspace } from "../../lib/cmux"
 import { getScriptDir } from "../../lib/config"
 import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
+import { getNotificationSound, getDashboardPollMs } from "../../lib/config"
 import { reconcileWorktrees } from "../../lib/state"
 
 import { useTaskState } from "../../hooks/useTaskState"
@@ -37,7 +38,7 @@ function runWorkbenchCmd(args: string[]): Promise<{ ok: boolean; stderr: string 
 }
 
 function Dashboard() {
-  const tasks = useTaskState(1000)
+  const tasks = useTaskState(getDashboardPollMs())
   const { alert, setAlert, dismissAlert } = useAlert()
   const { entries, pushEvent } = useEventLog()
   const [selected, setSelected] = useState(0)
@@ -59,17 +60,17 @@ function Dashboard() {
           case "done":
             pushEvent("✓", `${task.branch} — agent finished`)
             setAlert(`✓ ${task.branch} finished — ready for review`, "#22c55e", 6, true)
-            notify(`✓ ${task.branch}`, "Agent finished successfully", "Glass")
+            notify(`✓ ${task.branch}`, "Agent finished successfully", getNotificationSound("success"))
             break
           case "prompting":
             pushEvent("◉", `${task.branch} — waiting for input`)
             setAlert(`◉ ${task.branch} needs your attention`, "#eab308", 8, true)
-            notify(`⏳ ${task.branch}`, "Agent is waiting for input", "Ping")
+            notify(`⏳ ${task.branch}`, "Agent is waiting for input", getNotificationSound("waiting"))
             break
           case "failed":
             pushEvent("✗", `${task.branch} — agent failed`)
             setAlert(`✗ ${task.branch} failed`, "#ef4444", 10, true)
-            notify(`✗ ${task.branch}`, "Agent failed", "Basso")
+            notify(`✗ ${task.branch}`, "Agent failed", getNotificationSound("failure"))
             break
           case "running":
             pushEvent("●", `${task.branch} — agent started`)

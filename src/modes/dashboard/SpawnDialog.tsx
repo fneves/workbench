@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useKeyboard } from "@opentui/react"
+import { getDefaultAgent, getDefaultBaseBranch, getDefaultMode } from "../../lib/config"
 
 export interface SpawnOpts {
   branch: string
@@ -64,7 +65,8 @@ export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
   const [branch, setBranch] = useState("")
   const [interactive, setInteractive] = useState(0) // 0=interactive, 1=with prompt
   const [prompt, setPrompt] = useState("")
-  const [agentIdx, setAgentIdx] = useState(0)
+  const defaultAgentIdx = AGENT_OPTS.findIndex((o) => o.value === getDefaultAgent())
+  const [agentIdx, setAgentIdx] = useState(defaultAgentIdx >= 0 ? defaultAgentIdx : 0)
 
   const stepColor = (s: Step): string => {
     const order: Step[] = ["branch", "interactive", "prompt", "agent"]
@@ -89,8 +91,8 @@ export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
           branch: branch.trim(),
           prompt: interactive === 1 ? prompt.trim() : "",
           agent: AGENT_OPTS[agentIdx]!.value,
-          mode: "worktree",
-          baseBranch: "main",
+          mode: getDefaultMode(),
+          baseBranch: getDefaultBaseBranch(),
           interactive: interactive === 0,
         })
       } else if (key.name === "escape") onCancel()

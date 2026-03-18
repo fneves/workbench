@@ -83,6 +83,47 @@ WRAPPER_EOF
 chmod +x "$WRAPPER"
 echo -e "  ${GREEN}→${NC} workbench"
 
+# --- Create default config if missing ---
+CONFIG_DIR="$HOME/.workbench"
+CONFIG_FILE="$CONFIG_DIR/config.toml"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_FILE" <<'CONFIG_EOF'
+# workbench configuration — ~/.workbench/config.toml
+# Uncomment and edit any values you want to override.
+
+# Default agent for new tasks
+# agent = "claude"            # claude | opencode
+
+# Default base branch when creating worktrees
+# base_branch = "main"
+
+# Default task mode
+# mode = "worktree"           # worktree | container
+
+# Editor to open with 'e' in the watcher
+# Overrides $EDITOR. Falls back to $EDITOR, then code, nvim, vim.
+# editor = "code"
+
+# Parent directory for all worktrees ({worktree_dir}/{repo}/{branch})
+# worktree_dir = "~/.workbench-worktrees"
+
+[notifications]
+# enabled = true
+# sounds = true
+# sound_success = "Glass"     # macOS sound name for task completion
+# sound_failure = "Basso"     # macOS sound name for task failure
+# sound_waiting = "Ping"      # macOS sound name for waiting for input
+
+[intervals]
+# diff_poll_sec = 3           # how often diff stats refresh in the watcher
+# dashboard_poll_ms = 1000    # how often the dashboard polls task state
+CONFIG_EOF
+    echo -e "  ${GREEN}→${NC} ~/.workbench/config.toml"
+else
+    echo -e "  ${DIM}↷  ~/.workbench/config.toml (already exists, skipped)${NC}"
+fi
+
 # --- Verify PATH ---
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo ""

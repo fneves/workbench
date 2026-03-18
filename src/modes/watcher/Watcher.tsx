@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react"
 import { readState, type TaskState } from "../../lib/state"
 import { isInsideCmux, splitPaneWithIds, createSurfaceInPane, sendText, waitForSurface, focusSurface } from "../../lib/cmux"
 import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
+import { getDefaultEditor } from "../../lib/config"
 import { getChangedFiles } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
 
@@ -91,11 +92,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         break
       case "e":
         if (isInsideCmux()) {
-          const editor = process.env.EDITOR
-            ?? (Bun.which("code") ? "code" : null)
-            ?? (Bun.which("nvim") ? "nvim" : null)
-            ?? "vim"
-          openInBottomPane(`cd '${worktree}' && ${editor} .`)
+          openInBottomPane(`cd '${worktree}' && ${getDefaultEditor()} .`)
         }
         break
       case "g":

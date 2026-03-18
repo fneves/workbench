@@ -1,3 +1,10 @@
+import {
+  getNotificationsEnabled,
+  getNotificationSoundsEnabled,
+  getNotificationSound,
+  getDiffPollSec,
+} from "../lib/config"
+
 export function generateAgentWrapper(opts: {
   stateFile: string
   worktreeDir: string
@@ -6,6 +13,12 @@ export function generateAgentWrapper(opts: {
   prompt: string
   interactive: boolean
 }): string {
+  const notifyEnabled = getNotificationsEnabled()
+  const soundsEnabled = getNotificationSoundsEnabled()
+  const soundSuccess = soundsEnabled ? getNotificationSound("success") : ""
+  const soundFailure = soundsEnabled ? getNotificationSound("failure") : ""
+  const diffPollSec = getDiffPollSec()
+
   const agentCmd = (() => {
     if (opts.agent === "opencode") return "opencode"
     if (opts.interactive || !opts.prompt) return "claude"
@@ -66,10 +79,10 @@ notify() {
     printf "\\a"
 }
 
-# --- Background diff stat updater (every 3s) ---
+# --- Background diff stat updater (every ${diffPollSec}s) ---
 (
     while true; do
-        sleep 3
+        sleep ${diffPollSec}
         [[ -f "$STATE_FILE" ]] || break
         update_diff_stats
     done
@@ -95,10 +108,10 @@ update_diff_stats
 
 if [[ $EXIT_CODE -eq 0 ]]; then
     update_state "status" "done"
-    notify "✓ $BRANCH" "Agent finished successfully" "Glass"
+    ${notifyEnabled ? `notify "✓ $BRANCH" "Agent finished successfully" "${soundSuccess}"` : "# notifications disabled"}
 else
     update_state "status" "failed"
-    notify "✗ $BRANCH" "Agent exited with code $EXIT_CODE" "Basso"
+    ${notifyEnabled ? `notify "✗ $BRANCH" "Agent exited with code $EXIT_CODE" "${soundFailure}"` : "# notifications disabled"}
 fi
 
 echo ""
