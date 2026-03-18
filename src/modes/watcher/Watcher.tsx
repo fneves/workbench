@@ -91,7 +91,10 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         break
       case "e":
         if (isInsideCmux()) {
-          const editor = process.env.EDITOR ?? process.env.VISUAL ?? "vim"
+          const editor = process.env.EDITOR
+            ?? (Bun.which("code") ? "code" : null)
+            ?? (Bun.which("nvim") ? "nvim" : null)
+            ?? "vim"
           openInBottomPane(`cd '${worktree}' && ${editor} .`)
         }
         break
