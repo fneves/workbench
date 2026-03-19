@@ -1,7 +1,9 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useTerminalDimensions } from "@opentui/react"
 import { getFileChanges, type FileChange, type FileStatus } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
+
+export type { FileChange }
 
 const STATUS_CONFIG: Record<FileStatus, { label: string; color: string }> = {
   staged:    { label: "M", color: "#22c55e" },
@@ -14,19 +16,20 @@ const STATUS_CONFIG: Record<FileStatus, { label: string; color: string }> = {
   conflict:  { label: "!", color: "#ef4444" },
 }
 
-function FileRow({ file, pathWidth }: { file: FileChange; pathWidth: number }) {
+function FileRow({ file, pathWidth, selected }: { file: FileChange; pathWidth: number; selected: boolean }) {
   const { label, color } = STATUS_CONFIG[file.status]
   const displayPath = file.originalPath ? `${file.originalPath} → ${file.path}` : file.path
+  const indicator = selected ? "▸ " : "  "
   const truncated = displayPath.length > pathWidth
     ? "…" + displayPath.slice(-(pathWidth - 1))
     : displayPath
 
   return (
     <box style={{ flexDirection: "row", gap: 0 }}>
-      <text fg={color} style={{ width: 4 }}>
-        {"  " + label + " "}
+      <text fg={selected ? "#06b6d4" : color} style={{ width: 4 }}>
+        {indicator + label + " "}
       </text>
-      <text fg={color} style={{ width: pathWidth }}>
+      <text fg={selected ? "#06b6d4" : color} style={{ width: pathWidth }}>
         {truncated}
       </text>
       <text fg="#22c55e" style={{ width: 7 }}>
@@ -39,13 +42,25 @@ function FileRow({ file, pathWidth }: { file: FileChange; pathWidth: number }) {
   )
 }
 
-export function DiffStat({ worktree, maxFiles }: { worktree: string; maxFiles?: number }) {
+interface DiffStatProps {
+  worktree: string
+  maxFiles?: number
+  selectedIdx: number
+  onFilesChanged?: (files: FileChange[]) => void
+}
+
+export function DiffStat({ worktree, maxFiles, selectedIdx, onFilesChanged }: DiffStatProps) {
   const [files, setFiles] = useState<FileChange[]>(() => getFileChanges(worktree))
   const { width } = useTerminalDimensions()
 
   useInterval(() => {
-    setFiles(getFileChanges(worktree))
+    const updated = getFileChanges(worktree)
+    setFiles(updated)
   }, 2000)
+
+  useEffect(() => {
+    onFilesChanged?.(files)
+  }, [files])
 
   if (files.length === 0) {
     return <text fg="#666">{"  No changes yet"}</text>
@@ -63,8 +78,8 @@ export function DiffStat({ worktree, maxFiles }: { worktree: string; maxFiles?: 
         <text fg="#666" style={{ width: 7 }}>{"ADDED".padStart(6)}</text>
         <text fg="#666" style={{ width: 7 }}>{"REMOVED".padStart(7)}</text>
       </box>
-      {visible.map((file) => (
-        <FileRow key={file.path} file={file} pathWidth={pathWidth} />
+      {visible.map((file, i) => (
+        <FileRow key={file.path} file={file} pathWidth={pathWidth} selected={i === selectedIdx} />
       ))}
       {hidden > 0 && (
         <text fg="#555">{`  … and ${hidden} more  (f to browse all)`}</text>

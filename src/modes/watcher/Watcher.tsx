@@ -12,7 +12,7 @@ import { useInterval } from "../../hooks/useInterval"
 import { useAlert } from "../../hooks/useAlert"
 
 import { StatusBar } from "./StatusBar"
-import { DiffStat } from "./DiffStat"
+import { DiffStat, type FileChange } from "./DiffStat"
 
 const REVIEW_OPTS = [
   { label: "accept", desc: "write review file + send to agent" },
@@ -32,6 +32,11 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
   const [spinnerTick, setSpinnerTick] = useState(0)
   const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
   useInterval(() => { if (reviewLoading) setSpinnerTick((t) => (t + 1) % SPINNER_FRAMES.length) }, 100)
+
+  const [selectedFileIdx, setSelectedFileIdx] = useState(-1) // -1 = no selection
+  const filesRef = useRef<FileChange[]>([])
+  const hasFileSelected = selectedFileIdx >= 0 && selectedFileIdx < filesRef.current.length
+  const selectedFile = hasFileSelected ? filesRef.current[selectedFileIdx] : null
 
   const { alert, setAlert } = useAlert()
 
@@ -179,6 +184,21 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
     }
 
     switch (key.name) {
+      case "up":
+        setSelectedFileIdx((i) => {
+          if (i <= 0) return filesRef.current.length - 1
+          return i - 1
+        })
+        break
+      case "down":
+        setSelectedFileIdx((i) => {
+          if (i >= filesRef.current.length - 1) return 0
+          return i + 1
+        })
+        break
+      case "escape":
+        setSelectedFileIdx(-1)
+        break
       case "f":
         if (hasFzf && isInsideCmux()) {
           const files = getChangedFiles(worktree)
@@ -193,15 +213,26 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         break
       case "d":
         if (isInsideCmux()) {
-          const diffCmd = hasDelta
-            ? `cd '${worktree}' && git diff HEAD | delta --paging always`
-            : `cd '${worktree}' && git diff HEAD --color | less -R`
-          openInBottomPane(diffCmd)
+          if (selectedFile) {
+            const diffCmd = hasDelta
+              ? `cd '${worktree}' && git diff HEAD -- '${selectedFile.path}' | delta --paging always`
+              : `cd '${worktree}' && git diff HEAD --color -- '${selectedFile.path}' | less -R`
+            openInBottomPane(diffCmd)
+          } else {
+            const diffCmd = hasDelta
+              ? `cd '${worktree}' && git diff HEAD | delta --paging always`
+              : `cd '${worktree}' && git diff HEAD --color | less -R`
+            openInBottomPane(diffCmd)
+          }
         }
         break
       case "e":
         if (isInsideCmux()) {
-          openInBottomPane(`cd '${worktree}' && ${getDefaultEditor()} .`)
+          if (selectedFile) {
+            openInBottomPane(`cd '${worktree}' && ${getDefaultEditor()} '${selectedFile.path}'`)
+          } else {
+            openInBottomPane(`cd '${worktree}' && ${getDefaultEditor()} .`)
+          }
         }
         break
       case "g":
@@ -213,7 +244,8 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         if (hasClaudeReview && !reviewLoading) {
           setReviewLoading(true)
           setReviewReady(false)
-          const prompt = `You are an adversarial code reviewer. Run git diff HEAD to examine the current changes. Write a thorough review covering: bugs and logic errors, security vulnerabilities, missing edge cases and error handling, performance concerns, and code quality issues. Format as markdown with specific file and line references. Be critical and actionable.`
+          const fileScope = selectedFile ? `Run git diff HEAD -- '${selectedFile.path}' to examine the changes in ${selectedFile.path}.` : `Run git diff HEAD to examine the current changes.`
+          const prompt = `You are an adversarial code reviewer. ${fileScope} Write a thorough review covering: bugs and logic errors, security vulnerabilities, missing edge cases and error handling, performance concerns, and code quality issues. Format as markdown with specific file and line references. Be critical and actionable.`
           const escaped = prompt.replace(/'/g, "'\\''")
           Bun.spawn(["sh", "-c", `cd '${worktree}' && claude '${escaped}' > '${reviewFilePath}' && touch '${reviewSentinelPath}'`], {
             stdout: "ignore",
@@ -299,31 +331,33 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       </text>
       <text fg="#666">{"  " + now + " · " + (worktree.length > width - 16 ? "…" + worktree.slice(-(width - 17)) : worktree)}</text>
       <box style={{ paddingTop: 1 }}>
-        <DiffStat worktree={worktree} maxFiles={Math.max(3, height - 13)} />
+        <DiffStat
+          worktree={worktree}
+          maxFiles={Math.max(3, height - 13)}
+          selectedIdx={selectedFileIdx}
+          onFilesChanged={(f) => { filesRef.current = f }}
+        />
       </box>
       <box style={{ paddingTop: 1 }}>
         <text fg="#444">{"  ─────────────────────────────────"}</text>
       </box>
-      {hasFzf && (
-        <text>
-          {"  "}
-          <span fg="#06b6d4">f</span>{" file picker    "}
-          <span fg="#06b6d4">d</span>{" full diff    "}
-          <span fg="#06b6d4">e</span>{" editor"}
-        </text>
-      )}
-      {hasLazygit && (
-        <text>
-          {"  "}
-          <span fg="#06b6d4">g</span>{" lazygit       "}
-          <span fg="#06b6d4">s</span>{" stage all    "}
-          <span fg="#06b6d4">c</span>{" commit"}
-        </text>
-      )}
+      <text>
+        {"  "}
+        <span fg="#06b6d4">↑↓</span>{" select    "}
+        <span fg="#06b6d4">d</span>{selectedFile ? " file diff    " : " full diff    "}
+        <span fg="#06b6d4">e</span>{selectedFile ? " edit file" : " editor"}
+      </text>
+      <text>
+        {"  "}
+        <span fg="#06b6d4">f</span>{" file picker  "}
+        <span fg="#06b6d4">g</span>{" lazygit       "}
+        <span fg="#06b6d4">s</span>{" stage all    "}
+        <span fg="#06b6d4">c</span>{" commit"}
+      </text>
       {hasClaudeReview && (
         <text>
           {"  "}
-          <span fg="#06b6d4">r</span>{" review"}
+          <span fg="#06b6d4">r</span>{selectedFile ? " review file" : " review all"}
           {reviewLoading ? <span fg="#a855f7">{`  ${SPINNER_FRAMES[spinnerTick]} reviewing…`}</span> : null}
           {!reviewLoading && reviewReady ? <span fg="#22c55e">{"  ✓ review ready"}</span> : null}
           {!reviewLoading && reviewReady ? <span>{"    "}<span fg="#06b6d4">enter</span>{" review actions"}</span> : null}
@@ -331,6 +365,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       )}
       <text>
         {"  "}
+        {selectedFile ? <span><span fg="#06b6d4">esc</span>{" deselect    "}</span> : null}
         <span fg="#06b6d4">q</span>{" quit"}
       </text>
       {alert && (
