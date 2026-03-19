@@ -57,7 +57,7 @@ echo -e "\\033[0;35m\\033[1m⚡ workbench [container]\\033[0m — $BRANCH"
 echo -e "\\033[2m   worktree: $WORKTREE_DIR\\033[0m"
 echo ""
 
-claude -p '${escaped}'
+claude -p '${escaped}' --dangerously-skip-permissions
 EXIT_CODE=$?
 
 # --- Finalize ---
