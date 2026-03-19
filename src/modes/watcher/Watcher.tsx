@@ -269,6 +269,16 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           )
         }
         break
+      case "t":
+        if (isInsideCmux()) {
+          openInBottomPane(`cd '${worktree}' && exec $SHELL`)
+        }
+        break
+      case "x":
+        if (isInsideCmux()) {
+          openInBottomPane(`cd '${worktree}' && ./scripts/start.sh`)
+        }
+        break
       case "q":
         exitTui(0)
     }
@@ -341,33 +351,35 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       <box style={{ paddingTop: 1 }}>
         <text fg="#444">{"  ─────────────────────────────────"}</text>
       </box>
-      <text>
-        {"  "}
-        <span fg="#06b6d4">↑↓</span>{" select    "}
-        <span fg="#06b6d4">d</span>{selectedFile ? " file diff    " : " full diff    "}
-        <span fg="#06b6d4">e</span>{selectedFile ? " edit file" : " editor"}
-      </text>
-      <text>
-        {"  "}
-        <span fg="#06b6d4">f</span>{" file picker  "}
-        <span fg="#06b6d4">g</span>{" lazygit       "}
-        <span fg="#06b6d4">s</span>{" stage all    "}
-        <span fg="#06b6d4">c</span>{" commit"}
-      </text>
+      <box style={{ flexDirection: "row", gap: 0 }}>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">↑↓</span>{" select"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">d</span>{selectedFile ? " file diff" : " full diff"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">e</span>{selectedFile ? " edit file" : " editor"}</text>
+      </box>
+      <box style={{ flexDirection: "row", gap: 0 }}>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">f</span>{" file picker"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">g</span>{" lazygit"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">t</span>{" terminal"}</text>
+      </box>
+      <box style={{ flexDirection: "row", gap: 0 }}>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">s</span>{" stage all"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">c</span>{" commit"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">x</span>{" run app"}</text>
+      </box>
       {hasClaudeReview && (
-        <text>
-          {"  "}
-          <span fg="#06b6d4">r</span>{selectedFile ? " review file" : " review all"}
-          {reviewLoading ? <span fg="#a855f7">{`  ${SPINNER_FRAMES[spinnerTick]} reviewing…`}</span> : null}
-          {!reviewLoading && reviewReady ? <span fg="#22c55e">{"  ✓ review ready"}</span> : null}
-          {!reviewLoading && reviewReady ? <span>{"    "}<span fg="#06b6d4">enter</span>{" review actions"}</span> : null}
-        </text>
+        <box style={{ flexDirection: "row", gap: 0 }}>
+          <text style={{ width: 20 }}>
+            {"  "}<span fg="#06b6d4">r</span>{selectedFile ? " review file" : " review all"}
+          </text>
+          {reviewLoading ? <text fg="#a855f7">{`  ${SPINNER_FRAMES[spinnerTick]} reviewing…`}</text> : null}
+          {!reviewLoading && reviewReady ? <text fg="#22c55e">{"  ✓ review ready"}</text> : null}
+          {!reviewLoading && reviewReady ? <text>{"  "}<span fg="#06b6d4">enter</span>{" review actions"}</text> : null}
+        </box>
       )}
-      <text>
-        {"  "}
-        {selectedFile ? <span><span fg="#06b6d4">esc</span>{" deselect    "}</span> : null}
-        <span fg="#06b6d4">q</span>{" quit"}
-      </text>
+      <box style={{ flexDirection: "row", gap: 0 }}>
+        {selectedFile ? <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">esc</span>{" deselect"}</text> : null}
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">q</span>{" quit"}</text>
+      </box>
       {alert && (
         <box style={{ paddingTop: 1 }}>
           <text fg={alert.color}>{"  " + alert.message}</text>
