@@ -14,6 +14,8 @@ export interface WorkbenchConfig {
   base_branch?: string
   mode?: "worktree" | "container"
   worktree_dir?: string
+  container_image?: string
+  container_claude_home?: string
   notifications?: {
     enabled?: boolean
     sounds?: boolean
@@ -47,6 +49,12 @@ export const CONFIG_TEMPLATE = `# workbench configuration — ~/.workbench/confi
 
 # Parent directory for all worktrees ({worktree_dir}/{repo}/{branch})
 # worktree_dir = "~/.workbench-worktrees"
+
+# Default devcontainer base image (when repo has no .devcontainer/)
+# container_image = "mcr.microsoft.com/devcontainers/base:ubuntu"
+
+# Path to Claude credentials on the host (mounted read-only into containers)
+# container_claude_home = "~/.claude"
 
 [notifications]
 # enabled = true
@@ -126,6 +134,15 @@ export function getNotificationSound(type: "success" | "failure" | "waiting"): s
     case "failure": return n?.sound_failure ?? "Basso"
     case "waiting": return n?.sound_waiting ?? "Ping"
   }
+}
+
+export function getContainerImage(): string {
+  return getConfig().container_image ?? "mcr.microsoft.com/devcontainers/base:ubuntu"
+}
+
+export function getContainerClaudeHome(): string {
+  const raw = getConfig().container_claude_home ?? "~/.claude"
+  return raw.replace(/^~/, homedir())
 }
 
 export function getDiffPollSec(): number {

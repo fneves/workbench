@@ -4,6 +4,12 @@ import {
   getNotificationSound,
   getDiffPollSec,
 } from "../lib/config"
+import {
+  shellUpdateState,
+  shellUpdateDiffStats,
+  shellNotify,
+  shellDiffPoller,
+} from "./shell-helpers"
 
 export function generateAgentWrapper(opts: {
   stateFile: string
@@ -32,64 +38,15 @@ set -uo pipefail
 STATE_FILE="${opts.stateFile}"
 WORKTREE_DIR="${opts.worktreeDir}"
 BRANCH="${opts.branch}"
-BRANCH_SLUG="\${BRANCH//\//-}"
+BRANCH_SLUG="\${BRANCH//\\//-}"
 
-update_state() {
-    local key="$1" value="$2"
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg k "$key" --arg v "$value" \\
-        '.[$k] = $v | .updated_at = (now | todate)' \\
-        "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
-}
+${shellUpdateState()}
 
-update_diff_stats() {
-    local summary
-    summary="$(cd "$WORKTREE_DIR" && git diff --shortstat HEAD 2>/dev/null || echo "")"
-    local files=0 added=0 removed=0
-    if [[ -n "$summary" ]]; then
-        files=$(echo "$summary" | grep -oE '[0-9]+ file'       | grep -oE '[0-9]+' || echo 0)
-        added=$(echo "$summary" | grep -oE '[0-9]+ insertion'  | grep -oE '[0-9]+' || echo 0)
-        removed=$(echo "$summary" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
-    fi
-    local tmp
-    tmp="$(mktemp)"
-    jq --argjson f "\${files:-0}" --argjson a "\${added:-0}" --argjson r "\${removed:-0}" \\
-        '.diff_files = $f | .diff_added = $a | .diff_removed = $r | .updated_at = (now | todate)' \\
-        "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
-}
+${shellUpdateDiffStats()}
 
-notify() {
-    local title="$1" body="$2" sound="\${3:-default}"
-    # Use cmux notifications if inside cmux
-    if [[ -n "\${CMUX_SOCKET_PATH:-}" ]]; then
-        local socket="\$CMUX_SOCKET_PATH"
-        printf '{"id":"notify","method":"notification.create","params":{"title":"%s","body":"%s"}}\\n' "$title" "$body" | nc -U -w 1 "$socket" 2>/dev/null &
-    elif command -v terminal-notifier &>/dev/null; then
-        terminal-notifier \\
-            -title "$title" \\
-            -message "$body" \\
-            -group "workbench-$BRANCH_SLUG" \\
-            -sound "$sound" \\
-            2>/dev/null &
-    elif command -v osascript &>/dev/null; then
-        osascript -e "display notification \\"$body\\" with title \\"$title\\" sound name \\"$sound\\"" 2>/dev/null &
-    elif command -v notify-send &>/dev/null; then
-        notify-send --urgency=normal --app-name="workbench" "$title" "$body" 2>/dev/null &
-    fi
-    printf "\\a"
-}
+${shellNotify()}
 
-# --- Background diff stat updater (every ${diffPollSec}s) ---
-(
-    while true; do
-        sleep ${diffPollSec}
-        [[ -f "$STATE_FILE" ]] || break
-        update_diff_stats
-    done
-) &
-DIFF_PID=$!
-trap 'kill $DIFF_PID 2>/dev/null' EXIT
+${shellDiffPoller(diffPollSec)}
 
 # --- Mark as running ---
 cd "$WORKTREE_DIR"

@@ -42,8 +42,9 @@ export async function cmdList(): Promise<void> {
     const removed = `-${task.diff_removed}`.padStart(5)
     const files = `${task.diff_files}`.padStart(4)
 
+    const modeBadge = task.mode === "container" ? ` ${C.cyan}[ctr]${C.nc}` : ""
     console.log(
-      `  ${icon} ${branch} ${C.bold}${status}${C.nc}  ${C.green}${added}${C.nc} ${C.red}${removed}${C.nc} ${C.dim}(${files} files)${C.nc}  ${C.dim}[${task.agent}]${C.nc}`,
+      `  ${icon} ${branch} ${C.bold}${status}${C.nc}  ${C.green}${added}${C.nc} ${C.red}${removed}${C.nc} ${C.dim}(${files} files)${C.nc}  ${C.dim}[${task.agent}]${C.nc}${modeBadge}`,
     )
   }
 }

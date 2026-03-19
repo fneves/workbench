@@ -43,6 +43,8 @@ echo -e "${BOLD}Optional tools:${NC}"
 check_dep "jq" false                  # Used by agent wrapper scripts
 check_dep "claude" false              # Claude Code CLI
 check_dep "opencode" false            # OpenCode CLI
+check_dep "docker" false              # Required for container mode
+check_dep "devcontainer" false        # Required for container mode (npm i -g @devcontainers/cli)
 check_dep "fzf" false                 # Fuzzy finder
 check_dep "delta" false               # Better diffs
 check_dep "lazygit" false             # Git TUI
@@ -107,6 +109,12 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 
 # Parent directory for all worktrees ({worktree_dir}/{repo}/{branch})
 # worktree_dir = "~/.workbench-worktrees"
+
+# Default devcontainer base image (when repo has no .devcontainer/)
+# container_image = "mcr.microsoft.com/devcontainers/base:ubuntu"
+
+# Path to Claude credentials on the host (mounted read-only into containers)
+# container_claude_home = "~/.claude"
 
 [notifications]
 # enabled = true

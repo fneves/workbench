@@ -20,6 +20,13 @@ import {
   waitForSurface,
 } from "../lib/cmux"
 import { generateAgentWrapper } from "../templates/agent-wrapper"
+import { generateContainerAgentWrapper } from "../templates/container-agent-wrapper"
+import {
+  isDevcontainerCliAvailable,
+  isDockerRunning,
+  generateDevcontainerConfig,
+  writeDevcontainerConfig,
+} from "../lib/container"
 
 const C = {
   red: "\x1b[0;31m",
@@ -143,35 +150,114 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   await writeState(branch, state)
 
   // 3. Write agent wrapper script
-  const wrapperFile = `${WORKBENCH_STATE_DIR}/${branchToSlug(branch)}.run.sh`
-  writeFileSync(
-    wrapperFile,
-    generateAgentWrapper({
-      stateFile,
-      worktreeDir,
-      branch,
-      agent,
-      prompt,
-      interactive,
-    }),
-  )
-  chmodSync(wrapperFile, 0o755)
+  const slug = branchToSlug(branch)
+  const wrapperFile = `${WORKBENCH_STATE_DIR}/${slug}.run.sh`
 
-  console.log(`${C.dim}Agent:   ${wrapperFile}${C.nc}`)
+  if (mode === "container") {
+    // --- Container mode ---
 
-  // 5. Launch in cmux
-  if (!isInsideCmux()) {
-    console.log(`${C.yellow}Not inside cmux.${C.nc}`)
-    console.log()
-    console.log(`  ${C.bold}Option 1:${C.nc} Start workbench first inside cmux`)
-    console.log(`    ${C.cyan}workbench start${C.nc}`)
-    console.log()
-    console.log(`  ${C.bold}Option 2:${C.nc} Run standalone`)
-    console.log(`    ${C.cyan}zsh ${wrapperFile}${C.nc}`)
-    return
+    // Validate prerequisites
+    if (!isDevcontainerCliAvailable()) {
+      console.error(`${C.red}Error: 'devcontainer' CLI not found. Install it with:${C.nc}`)
+      console.error(`  ${C.cyan}npm install -g @devcontainers/cli${C.nc}`)
+      process.exit(1)
+    }
+    if (!isDockerRunning()) {
+      console.error(`${C.red}Error: Docker daemon is not running.${C.nc}`)
+      process.exit(1)
+    }
+    if (!prompt) {
+      console.error(`${C.red}Error: Container mode requires a prompt (-p). Interactive mode is not supported in containers.${C.nc}`)
+      process.exit(1)
+    }
+
+    // Generate and write devcontainer config
+    const dcConfig = generateDevcontainerConfig(worktreeDir, branch)
+    const dcConfigPath = writeDevcontainerConfig(branch, dcConfig)
+    await updateState(branch, { devcontainer_config: dcConfigPath })
+
+    console.log(`${C.dim}Config:  ${dcConfigPath}${C.nc}`)
+
+    // Write container agent wrapper
+    // devcontainer mounts at /workspaces/<folder-name>
+    const { basename: pathBasename } = await import("path")
+    const remoteWorkspaceDir = `/workspaces/${pathBasename(worktreeDir)}`
+    writeFileSync(
+      wrapperFile,
+      generateContainerAgentWrapper({
+        stateFile,
+        worktreeDir: remoteWorkspaceDir,
+        branch,
+        prompt,
+      }),
+    )
+    chmodSync(wrapperFile, 0o755)
+    console.log(`${C.dim}Agent:   ${wrapperFile}${C.nc}`)
+
+    // Build the compound command for cmux
+    const containerCmd = [
+      `devcontainer up --workspace-folder '${worktreeDir}' --config '${dcConfigPath}' --id-label 'workbench=${slug}'`,
+      `&& devcontainer exec --workspace-folder '${worktreeDir}' --config '${dcConfigPath}' --id-label 'workbench=${slug}' zsh /tmp/workbench/${slug}.run.sh`,
+    ].join(" ")
+
+    // Launch in cmux or print standalone instructions
+    if (!isInsideCmux()) {
+      console.log(`${C.yellow}Not inside cmux.${C.nc}`)
+      console.log()
+      console.log(`  ${C.bold}Option 1:${C.nc} Start workbench first inside cmux`)
+      console.log(`    ${C.cyan}workbench start${C.nc}`)
+      console.log()
+      console.log(`  ${C.bold}Option 2:${C.nc} Run standalone`)
+      console.log(`    ${C.cyan}${containerCmd}${C.nc}`)
+      return
+    }
+
+    await launchInCmux(branch, worktreeDir, containerCmd)
+  } else {
+    // --- Worktree mode (existing behavior) ---
+
+    writeFileSync(
+      wrapperFile,
+      generateAgentWrapper({
+        stateFile,
+        worktreeDir,
+        branch,
+        agent,
+        prompt,
+        interactive,
+      }),
+    )
+    chmodSync(wrapperFile, 0o755)
+    console.log(`${C.dim}Agent:   ${wrapperFile}${C.nc}`)
+
+    if (!isInsideCmux()) {
+      console.log(`${C.yellow}Not inside cmux.${C.nc}`)
+      console.log()
+      console.log(`  ${C.bold}Option 1:${C.nc} Start workbench first inside cmux`)
+      console.log(`    ${C.cyan}workbench start${C.nc}`)
+      console.log()
+      console.log(`  ${C.bold}Option 2:${C.nc} Run standalone`)
+      console.log(`    ${C.cyan}zsh ${wrapperFile}${C.nc}`)
+      return
+    }
+
+    await launchInCmux(branch, worktreeDir, `zsh '${wrapperFile}'`)
   }
 
-  // Create a new workspace for this task
+  console.log()
+  console.log(`${C.green}${C.bold}✓ Task spawned: ${branch}${C.nc}`)
+  console.log(`  ${C.dim}Worktree:  ${worktreeDir}${C.nc}`)
+  console.log(`  ${C.dim}Agent:     ${agent}${C.nc}`)
+  console.log(`  ${C.dim}Mode:      ${mode}${C.nc}`)
+  console.log(`  ${C.dim}Prompt:    ${prompt ? prompt.slice(0, 80) : "(interactive)"}${C.nc}`)
+}
+
+/** Shared helper: create a cmux workspace, send a command, and open a watcher pane. */
+async function launchInCmux(
+  branch: string,
+  worktreeDir: string,
+  cmd: string,
+): Promise<void> {
   const wsName = branch
   console.log(`${C.green}Creating cmux workspace: ${wsName}${C.nc}`)
 
@@ -198,21 +284,13 @@ export async function cmdSpawn(args: string[]): Promise<void> {
     await updateState(branch, { cmux_agent_surface_id: defaultSurface.id })
   }
 
-  // Send the agent wrapper command to the new workspace's terminal
-  await sendText(`zsh '${wrapperFile}'\n`)
+  // Send the command to the new workspace's terminal
+  await sendText(`${cmd}\n`)
 
   // Create a right split for the watcher TUI
   const watcherSurfaceId = await splitPane("right")
   if (watcherSurfaceId) {
-    // Wait for the new pane's shell to be ready before sending the command
     await waitForSurface(watcherSurfaceId)
     await sendText(`workbench watcher '${worktreeDir}' '${branch}'\n`, watcherSurfaceId)
   }
-
-  console.log()
-  console.log(`${C.green}${C.bold}✓ Task spawned: ${branch}${C.nc}`)
-  console.log(`  ${C.dim}Worktree:  ${worktreeDir}${C.nc}`)
-  console.log(`  ${C.dim}Agent:     ${agent}${C.nc}`)
-  console.log(`  ${C.dim}Mode:      ${mode}${C.nc}`)
-  console.log(`  ${C.dim}Prompt:    ${prompt ? prompt.slice(0, 80) : "(interactive)"}${C.nc}`)
 }

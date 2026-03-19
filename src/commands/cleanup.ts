@@ -4,6 +4,7 @@ import { readState, listTasks } from "../lib/state"
 import { removeWorktree } from "../lib/git"
 import { killProcess, isProcessAlive } from "../lib/process"
 import { listWorkspaces, closeWorkspace, currentWorkspaceId } from "../lib/cmux"
+import { stopContainer, cleanupAllContainers } from "../lib/container"
 
 const C = {
   red: "\x1b[0;31m",
@@ -23,6 +24,23 @@ export async function doCleanupTask(branch: string): Promise<void> {
   if (state?.pid && isProcessAlive(state.pid)) {
     console.log(`  ${C.dim}Killing agent (PID ${state.pid})${C.nc}`)
     killProcess(state.pid)
+  }
+
+  // Stop container if this was a container task
+  if (state?.mode === "container") {
+    const slug = branchToSlug(branch)
+    console.log(`  ${C.dim}Stopping container: workbench=${slug}${C.nc}`)
+    stopContainer(slug)
+
+    // Remove generated devcontainer config dir
+    const dcConfigDir = `${WORKBENCH_STATE_DIR}/${slug}.devcontainer`
+    if (existsSync(dcConfigDir)) {
+      rmSync(dcConfigDir, { recursive: true, force: true })
+    }
+
+    // Remove sentinel notification file
+    const sentinelFile = `${WORKBENCH_STATE_DIR}/${slug}.notify`
+    try { unlinkSync(sentinelFile) } catch {}
   }
 
   // Close cmux workspace for this task
@@ -61,6 +79,10 @@ export async function cmdCleanup(): Promise<void> {
   for (const task of tasks) {
     await doCleanupTask(task.branch)
   }
+
+  // Remove all workbench-labelled containers
+  console.log(`${C.yellow}Removing all workbench containers...${C.nc}`)
+  cleanupAllContainers()
 
   // Close the orchestrator workspace too, but not the one running this command
   const currentWsId = currentWorkspaceId()
