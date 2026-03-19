@@ -3,7 +3,7 @@ import { getDiffStat } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
 
 export function DiffStat({ worktree }: { worktree: string }) {
-  const [stat, setStat] = useState("")
+  const [stat, setStat] = useState(() => getDiffStat(worktree))
 
   useInterval(() => {
     setStat(getDiffStat(worktree))

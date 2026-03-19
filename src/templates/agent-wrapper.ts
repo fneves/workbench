@@ -32,6 +32,7 @@ set -uo pipefail
 STATE_FILE="${opts.stateFile}"
 WORKTREE_DIR="${opts.worktreeDir}"
 BRANCH="${opts.branch}"
+BRANCH_SLUG="\${BRANCH//\//-}"
 
 update_state() {
     local key="$1" value="$2"
@@ -68,7 +69,7 @@ notify() {
         terminal-notifier \\
             -title "$title" \\
             -message "$body" \\
-            -group "workbench-$BRANCH" \\
+            -group "workbench-$BRANCH_SLUG" \\
             -sound "$sound" \\
             2>/dev/null &
     elif command -v osascript &>/dev/null; then

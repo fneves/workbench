@@ -69,6 +69,13 @@ export function getUntrackedFiles(worktreeDir: string): string[] {
   return result.stdout.split("\n").filter(Boolean)
 }
 
+export function getCurrentBranch(worktreeDir: string): string | null {
+  const result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], worktreeDir)
+  const branch = result.stdout
+  if (!result.ok || !branch || branch === "HEAD") return null
+  return branch
+}
+
 export function getChangedFiles(worktreeDir: string): string[] {
   const result = run(["git", "diff", "--name-only", "HEAD"], worktreeDir)
   if (!result.ok || !result.stdout) return []

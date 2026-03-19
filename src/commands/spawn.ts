@@ -173,7 +173,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   }
 
   // Create a new workspace for this task
-  const wsName = branchToSlug(branch)
+  const wsName = branch
   console.log(`${C.green}Creating cmux workspace: ${wsName}${C.nc}`)
 
   let activeWsId = await newWorkspace(wsName)

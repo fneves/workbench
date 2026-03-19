@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { readState, type TaskState } from "../../lib/state"
 import { isInsideCmux, splitPaneWithIds, createSurfaceInPane, sendText, waitForSurface, focusSurface } from "../../lib/cmux"
 import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
-import { getDefaultEditor } from "../../lib/config"
+import { getDefaultEditor, branchToSlug } from "../../lib/config"
 import { getChangedFiles } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
 import { useAlert } from "../../hooks/useAlert"
@@ -35,7 +35,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
   const { alert, setAlert } = useAlert()
 
-  const reviewFilePath = `/tmp/workbench/${branch}-review.md`
+  const reviewFilePath = `/tmp/workbench/${branchToSlug(branch)}-review.md`
   const reviewSentinelPath = `${reviewFilePath}.ready`
   const hasClaudeReview = Bun.which("claude") !== null
 
@@ -152,7 +152,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
   const handleReviewIterate = async () => {
     setShowReviewActions(false)
-    const iteratePrompt = `I have a code review draft that I want to refine with your help. After our discussion, update the file /tmp/workbench/${branch}-review.md with the final agreed-upon review using your Write tool.\\n\\nCurrent review:\\n$(cat '${reviewFilePath}' 2>/dev/null || echo "(no review yet)")`
+    const iteratePrompt = `I have a code review draft that I want to refine with your help. After our discussion, update the file ${reviewFilePath} with the final agreed-upon review using your Write tool.\\n\\nCurrent review:\\n$(cat '${reviewFilePath}' 2>/dev/null || echo "(no review yet)")`
     const escaped = iteratePrompt.replace(/'/g, "'\\''")
     await openInBottomPane(`cd '${worktree}' && claude '${escaped}'`)
   }

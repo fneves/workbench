@@ -1,9 +1,9 @@
 import { existsSync, rmSync, unlinkSync } from "fs"
-import { WORKBENCH_STATE_DIR, getStateFile } from "../lib/config"
+import { WORKBENCH_STATE_DIR, getStateFile, branchToSlug } from "../lib/config"
 import { readState, listTasks } from "../lib/state"
 import { removeWorktree } from "../lib/git"
 import { killProcess, isProcessAlive } from "../lib/process"
-import { listWorkspaces, closeWorkspace } from "../lib/cmux"
+import { listWorkspaces, closeWorkspace, currentWorkspaceId } from "../lib/cmux"
 
 const C = {
   red: "\x1b[0;31m",
@@ -42,8 +42,9 @@ export async function doCleanupTask(branch: string): Promise<void> {
 
   // Clean up state files
   const stateFile = getStateFile(branch)
-  const wrapperFile = `${WORKBENCH_STATE_DIR}/${branch}.run.sh`
-  const watcherFile = `${WORKBENCH_STATE_DIR}/${branch}.watch.sh`
+  const slug = branchToSlug(branch)
+  const wrapperFile = `${WORKBENCH_STATE_DIR}/${slug}.run.sh`
+  const watcherFile = `${WORKBENCH_STATE_DIR}/${slug}.watch.sh`
 
   for (const f of [stateFile, wrapperFile, watcherFile]) {
     try { unlinkSync(f) } catch {}
@@ -61,9 +62,11 @@ export async function cmdCleanup(): Promise<void> {
     await doCleanupTask(task.branch)
   }
 
-  // Close the orchestrator workspace too
+  // Close the orchestrator workspace too, but not the one running this command
+  const currentWsId = currentWorkspaceId()
   const allWorkspaces = await listWorkspaces()
   for (const ws of allWorkspaces) {
+    if (ws.id === currentWsId) continue
     if (ws.title.includes("workbench") || ws.title.includes("⚡")) {
       console.log(`${C.yellow}Closing cmux workspace: ${ws.title}${C.nc}`)
       await closeWorkspace(ws.id)

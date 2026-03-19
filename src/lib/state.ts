@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from "fs"
 import { basename, resolve } from "path"
 import { WORKBENCH_STATE_DIR, getStateFile, getRepoRoot } from "./config"
-import { getDiffStats } from "./git"
+import { getDiffStats, getCurrentBranch } from "./git"
 import { isProcessAlive } from "./process"
 
 export interface TaskState {
@@ -121,6 +121,8 @@ export async function reconcileWorktrees(): Promise<void> {
       const worktreeDir = resolve(worktreesBase, branch)
       try {
         if (!statSync(worktreeDir).isDirectory()) continue
+        // Must have a .git file to be a real worktree (not a grouping dir like "fn/")
+        if (!existsSync(resolve(worktreeDir, ".git"))) continue
       } catch {
         continue
       }
@@ -129,10 +131,11 @@ export async function reconcileWorktrees(): Promise<void> {
       if (existing) continue
 
       // No state file — create one from what we can infer
+      const actualBranch = getCurrentBranch(worktreeDir) ?? branch
       const diff = getDiffStats(worktreeDir)
       const now = new Date().toISOString()
       const state: TaskState = {
-        branch,
+        branch: actualBranch,
         status: "unknown",
         agent: "claude",
         mode: "worktree",
@@ -147,7 +150,7 @@ export async function reconcileWorktrees(): Promise<void> {
         cmux_workspace_id: null,
         cmux_agent_surface_id: null,
       }
-      await writeState(branch, state)
+      await writeState(actualBranch, state)
     }
   }
 
