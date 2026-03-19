@@ -8,6 +8,15 @@ function run(args: string[], cwd?: string): { ok: boolean; stdout: string } {
   }
 }
 
+/** Like run() but preserves leading whitespace (needed for porcelain parsing). */
+function runRaw(args: string[], cwd?: string): { ok: boolean; stdout: string } {
+  const result = Bun.spawnSync(args, { cwd })
+  return {
+    ok: result.exitCode === 0,
+    stdout: result.stdout.toString().trimEnd(),
+  }
+}
+
 export function createWorktree(
   worktreeDir: string,
   branch: string,
@@ -80,4 +89,83 @@ export function getChangedFiles(worktreeDir: string): string[] {
   const result = run(["git", "diff", "--name-only", "HEAD"], worktreeDir)
   if (!result.ok || !result.stdout) return []
   return result.stdout.split("\n").filter(Boolean)
+}
+
+export type FileStatus = "staged" | "unstaged" | "both" | "added" | "deleted" | "renamed" | "untracked" | "conflict"
+
+export interface FileChange {
+  path: string
+  originalPath?: string
+  status: FileStatus
+  added: number
+  removed: number
+}
+
+export function getFileChanges(worktreeDir: string): FileChange[] {
+  const statusResult = runRaw(["git", "status", "--porcelain", "-uall"], worktreeDir)
+  if (!statusResult.ok || !statusResult.stdout) return []
+
+  // Per-file line counts: combine unstaged (working tree vs index) and staged (index vs HEAD)
+  const lineMap = new Map<string, { added: number; removed: number }>()
+  const numstatCmds = [
+    run(["git", "diff", "--numstat"], worktreeDir),         // unstaged
+    run(["git", "diff", "--numstat", "--cached"], worktreeDir), // staged
+  ]
+  for (const result of numstatCmds) {
+    if (!result.ok || !result.stdout) continue
+    for (const line of result.stdout.split("\n")) {
+      const parts = line.split("\t")
+      if (parts.length < 3) continue
+      const added = parseInt(parts[0]!, 10)
+      const removed = parseInt(parts[1]!, 10)
+      const path = parts[2]!
+      if (!isNaN(added) && !isNaN(removed) && path) {
+        const prev = lineMap.get(path) ?? { added: 0, removed: 0 }
+        lineMap.set(path, { added: prev.added + added, removed: prev.removed + removed })
+      }
+    }
+  }
+
+  const changes: FileChange[] = []
+
+  for (const line of statusResult.stdout.split("\n")) {
+    if (line.length < 3) continue
+    const x = line[0]!
+    const y = line[1]!
+    const rest = line.slice(3)
+
+    let path = rest
+    let originalPath: string | undefined
+
+    // Renames/copies: porcelain v1 uses tab to separate new\told paths
+    if ((x === "R" || x === "C") && rest.includes("\t")) {
+      const tabIdx = rest.indexOf("\t")
+      path = rest.slice(0, tabIdx)
+      originalPath = rest.slice(tabIdx + 1)
+    }
+
+    let status: FileStatus
+    if (x === "?" && y === "?") {
+      status = "untracked"
+    } else if (x === "U" || y === "U") {
+      status = "conflict"
+    } else if (x === "R" || x === "C") {
+      status = "renamed"
+    } else if (x === "A" && y === " ") {
+      status = "added"
+    } else if (x === "D" || y === "D") {
+      status = "deleted"
+    } else if (x !== " " && y !== " ") {
+      status = "both"
+    } else if (x !== " ") {
+      status = "staged"
+    } else {
+      status = "unstaged"
+    }
+
+    const lineCount = lineMap.get(path) ?? { added: 0, removed: 0 }
+    changes.push({ path, originalPath, status, ...lineCount })
+  }
+
+  return changes
 }

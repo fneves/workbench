@@ -1,6 +1,6 @@
 import { unlinkSync } from "fs"
 import { createCliRenderer } from "@opentui/core"
-import { createRoot, useKeyboard } from "@opentui/react"
+import { createRoot, useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { useState, useRef, useEffect } from "react"
 
 import { readState, type TaskState } from "../../lib/state"
@@ -13,7 +13,6 @@ import { useAlert } from "../../hooks/useAlert"
 
 import { StatusBar } from "./StatusBar"
 import { DiffStat } from "./DiffStat"
-import { UntrackedFiles } from "./UntrackedFiles"
 
 const REVIEW_OPTS = [
   { label: "accept", desc: "write review file + send to agent" },
@@ -22,6 +21,7 @@ const REVIEW_OPTS = [
 ]
 
 function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) {
+  const { height, width } = useTerminalDimensions()
   const [status, setStatus] = useState<TaskState["status"]>("unknown")
   const lastStatus = useRef("")
 
@@ -297,11 +297,10 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         <span fg="#666">{"  ·  "}</span>
         <span fg="#06b6d4">{branch}</span>
       </text>
-      <text fg="#666">{"  " + now + " · " + worktree}</text>
+      <text fg="#666">{"  " + now + " · " + (worktree.length > width - 16 ? "…" + worktree.slice(-(width - 17)) : worktree)}</text>
       <box style={{ paddingTop: 1 }}>
-        <DiffStat worktree={worktree} />
+        <DiffStat worktree={worktree} maxFiles={Math.max(3, height - 13)} />
       </box>
-      <UntrackedFiles worktree={worktree} />
       <box style={{ paddingTop: 1 }}>
         <text fg="#444">{"  ─────────────────────────────────"}</text>
       </box>

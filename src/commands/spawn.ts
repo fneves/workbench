@@ -5,7 +5,6 @@ import {
   DEFAULT_BASE_BRANCH,
   getWorktreeDir,
   getStateFile,
-  getScriptDir,
   branchToSlug,
 } from "../lib/config"
 import { writeState, updateState, newTaskState } from "../lib/state"
@@ -203,14 +202,11 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   await sendText(`zsh '${wrapperFile}'\n`)
 
   // Create a right split for the watcher TUI
-  const scriptDir = getScriptDir()
-  const entryPoint = `${scriptDir}/src/index.tsx`
-  const bunPath = Bun.which("bun") ?? "bun"
   const watcherSurfaceId = await splitPane("right")
   if (watcherSurfaceId) {
     // Wait for the new pane's shell to be ready before sending the command
     await waitForSurface(watcherSurfaceId)
-    await sendText(`${bunPath} run ${entryPoint} watcher '${worktreeDir}' '${branch}'\n`, watcherSurfaceId)
+    await sendText(`workbench watcher '${worktreeDir}' '${branch}'\n`, watcherSurfaceId)
   }
 
   console.log()

@@ -1,28 +1,74 @@
 import { useState } from "react"
-import { getDiffStat } from "../../lib/git"
+import { useTerminalDimensions } from "@opentui/react"
+import { getFileChanges, type FileChange, type FileStatus } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
 
-export function DiffStat({ worktree }: { worktree: string }) {
-  const [stat, setStat] = useState(() => getDiffStat(worktree))
+const STATUS_CONFIG: Record<FileStatus, { label: string; color: string }> = {
+  staged:    { label: "M", color: "#22c55e" },
+  added:     { label: "A", color: "#22c55e" },
+  unstaged:  { label: "M", color: "#eab308" },
+  both:      { label: "M", color: "#f59e0b" },
+  deleted:   { label: "D", color: "#ef4444" },
+  renamed:   { label: "R", color: "#06b6d4" },
+  untracked: { label: "?", color: "#555555" },
+  conflict:  { label: "!", color: "#ef4444" },
+}
+
+function FileRow({ file, pathWidth }: { file: FileChange; pathWidth: number }) {
+  const { label, color } = STATUS_CONFIG[file.status]
+  const displayPath = file.originalPath ? `${file.originalPath} → ${file.path}` : file.path
+  const truncated = displayPath.length > pathWidth
+    ? "…" + displayPath.slice(-(pathWidth - 1))
+    : displayPath
+
+  return (
+    <box style={{ flexDirection: "row", gap: 0 }}>
+      <text fg={color} style={{ width: 4 }}>
+        {"  " + label + " "}
+      </text>
+      <text fg={color} style={{ width: pathWidth }}>
+        {truncated}
+      </text>
+      <text fg="#22c55e" style={{ width: 7 }}>
+        {file.added > 0 ? `+${file.added}`.padStart(6) : ""}
+      </text>
+      <text fg="#ef4444" style={{ width: 7 }}>
+        {file.removed > 0 ? `-${file.removed}`.padStart(6) : ""}
+      </text>
+    </box>
+  )
+}
+
+export function DiffStat({ worktree, maxFiles }: { worktree: string; maxFiles?: number }) {
+  const [files, setFiles] = useState<FileChange[]>(() => getFileChanges(worktree))
+  const { width } = useTerminalDimensions()
 
   useInterval(() => {
-    setStat(getDiffStat(worktree))
+    setFiles(getFileChanges(worktree))
   }, 2000)
 
-  if (!stat) {
+  if (files.length === 0) {
     return <text fg="#666">{"  No changes yet"}</text>
   }
 
-  // getDiffStat returns ANSI-colored output which we can't render as-is in OpenTUI.
-  // Fall back to plain text by stripping ANSI codes.
-  const plain = stat.replace(/\x1b\[[0-9;]*m/g, "")
-  const lines = plain.split("\n")
+  const pathWidth = Math.max(10, width - 4 - 7 - 7)
+  const visible = maxFiles != null ? files.slice(0, maxFiles) : files
+  const hidden = files.length - visible.length
 
   return (
     <box style={{ flexDirection: "column" }}>
-      {lines.map((line, i) => (
-        <text key={i}>{"  " + line}</text>
+      <box style={{ flexDirection: "row", gap: 0 }}>
+        <text fg="#666" style={{ width: 4 }}>{"  "}</text>
+        <text fg="#666" style={{ width: pathWidth }}>{"FILE"}</text>
+        <text fg="#666" style={{ width: 7 }}>{"ADDED".padStart(6)}</text>
+        <text fg="#666" style={{ width: 7 }}>{"REMOVED".padStart(7)}</text>
+      </box>
+      {visible.map((file) => (
+        <FileRow key={file.path} file={file} pathWidth={pathWidth} />
       ))}
+      {hidden > 0 && (
+        <text fg="#555">{`  … and ${hidden} more  (f to browse all)`}</text>
+      )}
     </box>
   )
 }
