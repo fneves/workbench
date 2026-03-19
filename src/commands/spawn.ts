@@ -6,6 +6,7 @@ import {
   getWorktreeDir,
   getStateFile,
   getScriptDir,
+  branchToSlug,
 } from "../lib/config"
 import { writeState, updateState, newTaskState } from "../lib/state"
 import { createWorktree } from "../lib/git"
@@ -143,7 +144,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   await writeState(branch, state)
 
   // 3. Write agent wrapper script
-  const wrapperFile = `${WORKBENCH_STATE_DIR}/${branch}.run.sh`
+  const wrapperFile = `${WORKBENCH_STATE_DIR}/${branchToSlug(branch)}.run.sh`
   writeFileSync(
     wrapperFile,
     generateAgentWrapper({
@@ -172,7 +173,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   }
 
   // Create a new workspace for this task
-  const wsName = branch
+  const wsName = branchToSlug(branch)
   console.log(`${C.green}Creating cmux workspace: ${wsName}${C.nc}`)
 
   let activeWsId = await newWorkspace(wsName)

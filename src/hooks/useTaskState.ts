@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { listTasks, type TaskState } from "../lib/state"
 import { useInterval } from "./useInterval"
 
@@ -10,6 +10,7 @@ export function useTaskState(pollMs = 1000): TaskState[] {
     setTasks(current)
   }, [])
 
+  useEffect(() => { poll() }, [poll])
   useInterval(() => { poll() }, pollMs)
 
   return tasks

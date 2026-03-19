@@ -56,7 +56,9 @@ switch (command) {
     break
   }
   case "dashboard": {
+    const { reconcileWorktrees } = await import("./lib/state")
     const { runDashboard } = await import("./modes/dashboard/Dashboard")
+    await reconcileWorktrees()
     await runDashboard()
     break
   }

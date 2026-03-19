@@ -159,16 +159,21 @@ export function getRepoName(): string {
   return basename(getRepoRoot())
 }
 
+/** Converts a branch name to a safe filesystem slug (replaces / with -). */
+export function branchToSlug(branch: string): string {
+  return branch.replace(/\//g, "-")
+}
+
 export function getWorktreeDir(branch: string): string {
   const repo = getRepoRoot()
   const name = basename(repo)
   const configDir = getConfig().worktree_dir?.replace(/^~/, homedir())
   const parent = configDir ?? resolve(repo, "..", ".workbench-worktrees")
-  return resolve(parent, name, branch)
+  return resolve(parent, name, branchToSlug(branch))
 }
 
 export function getStateFile(branch: string): string {
-  return `${WORKBENCH_STATE_DIR}/${branch}.json`
+  return `${WORKBENCH_STATE_DIR}/${branchToSlug(branch)}.json`
 }
 
 export function getScriptDir(): string {
