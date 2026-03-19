@@ -80,14 +80,16 @@ export function generateDevcontainerConfig(
     ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
   }
 
-  const postCreateCmd =
-    "sudo apt-get update && sudo apt-get install -y jq && npm install -g @anthropic-ai/claude-code"
-
   // Check if the repo has its own devcontainer config
   const repoConfigPath = resolve(worktreeDir, ".devcontainer", "devcontainer.json")
   if (existsSync(repoConfigPath)) {
     try {
-      const existing = JSON.parse(readFileSync(repoConfigPath, "utf8"))
+      // Strip JSONC comments (// and /* */) before parsing
+      const raw = readFileSync(repoConfigPath, "utf8")
+      const stripped = raw
+        .replace(/\/\/.*$/gm, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+      const existing = JSON.parse(stripped)
 
       // Merge mounts
       const existingMounts: string[] = existing.mounts ?? []
@@ -100,24 +102,68 @@ export function generateDevcontainerConfig(
       const existingEnv: Record<string, string> = existing.containerEnv ?? {}
       const mergedEnv = { ...existingEnv, ...requiredEnv }
 
-      // Append to postCreateCommand
+      // Build postCreateCommand: always ensure jq + claude-code are available
+      const features = existing.features ?? {}
+      const hasClaudeCode = Object.keys(features).some((k) =>
+        k.includes("claude-code"),
+      )
+      const installSteps = [
+        "sudo apt-get update && sudo apt-get install -y jq",
+        ...(hasClaudeCode ? [] : ["npm install -g @anthropic-ai/claude-code"]),
+      ]
+      const workbenchPostCreate = installSteps.join(" && ")
+
       const existingPostCreate: string = existing.postCreateCommand ?? ""
       const mergedPostCreate = existingPostCreate
-        ? `${existingPostCreate} && ${postCreateCmd}`
-        : postCreateCmd
+        ? `${existingPostCreate} && ${workbenchPostCreate}`
+        : workbenchPostCreate
+
+      // Override hostRequirements to sane local defaults
+      const localHostRequirements = {
+        cpus: Math.min(existing.hostRequirements?.cpus ?? 2, 4),
+        memory: "8gb",
+      }
+
+      // Filter runArgs: remove --device flags (not available on macOS Docker)
+      const existingRunArgs: string[] = existing.runArgs ?? []
+      const filteredRunArgs = existingRunArgs.filter(
+        (arg: string) => !arg.startsWith("--device="),
+      )
+
+      // Remove Codespaces-only fields
+      const { secrets, customizations, updateContentCommand, ...rest } = existing
+
+      // Remove features that require Codespaces environment
+      for (const key of Object.keys(features)) {
+        if (key.includes("tailscale") || key.includes("sshd")) {
+          delete features[key]
+        }
+      }
+
+      // Ensure node feature is present if claude-code isn't a feature
+      const mergedFeatures = { ...features }
+      if (!hasClaudeCode && !Object.keys(features).some((k) => k.includes("/node:"))) {
+        mergedFeatures["ghcr.io/devcontainers/features/node:1"] = {}
+      }
 
       return {
-        ...existing,
+        ...rest,
         name: `workbench-${slug}`,
+        features: mergedFeatures,
         mounts: mergedMounts,
         containerEnv: mergedEnv,
         postCreateCommand: mergedPostCreate,
-        remoteUser: existing.remoteUser ?? "node",
+        hostRequirements: localHostRequirements,
+        runArgs: filteredRunArgs.length > 0 ? filteredRunArgs : undefined,
+        remoteUser: existing.remoteUser ?? "vscode",
       }
     } catch {
       // Failed to parse existing config — fall through to generate minimal
     }
   }
+
+  const fullPostCreateCmd =
+    "sudo apt-get update && sudo apt-get install -y jq && npm install -g @anthropic-ai/claude-code"
 
   return {
     name: `workbench-${slug}`,
@@ -126,7 +172,7 @@ export function generateDevcontainerConfig(
       "ghcr.io/devcontainers/features/node:1": {},
     },
     mounts: requiredMounts,
-    postCreateCommand: postCreateCmd,
+    postCreateCommand: fullPostCreateCmd,
     containerEnv: requiredEnv,
     remoteUser: "vscode",
   }
