@@ -1,4 +1,4 @@
-import { unlinkSync } from "fs"
+import { unlinkSync, writeFileSync, chmodSync } from "fs"
 import { createCliRenderer } from "@opentui/core"
 import { createRoot, useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { useState, useRef, useEffect } from "react"
@@ -7,6 +7,7 @@ import { readState, type TaskState } from "../../lib/state"
 import { isInsideCmux, splitPaneWithIds, createSurfaceInPane, sendText, waitForSurface, focusSurface } from "../../lib/cmux"
 import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
 import { getDefaultEditor, branchToSlug } from "../../lib/config"
+import { generatePrCreatorScript } from "../../templates/pr-creator"
 import { getChangedFiles } from "../../lib/git"
 import { useInterval } from "../../hooks/useInterval"
 import { useAlert } from "../../hooks/useAlert"
@@ -43,10 +44,24 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
   const reviewFilePath = `/tmp/workbench/${branchToSlug(branch)}-review.md`
   const reviewSentinelPath = `${reviewFilePath}.ready`
   const hasClaudeReview = Bun.which("claude") !== null
+  const hasGh = Bun.spawnSync(["which", "gh"]).exitCode === 0
+
+  const [prUrl, setPrUrl] = useState<string | null>(null)
+  const prSentinelPath = `/tmp/workbench/${branchToSlug(branch)}.pr-url`
 
   useInterval(async () => {
     const state = await readState(branch)
     if (state) setStatus(state.status)
+  }, 1000)
+
+  // Poll for PR URL sentinel
+  useInterval(async () => {
+    if (prUrl) return
+    const file = Bun.file(prSentinelPath)
+    if (await file.exists()) {
+      const url = (await file.text()).trim()
+      if (url) setPrUrl(url)
+    }
   }, 1000)
 
   // Poll for review sentinel — fires when background review agent finishes
@@ -269,6 +284,16 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           )
         }
         break
+      case "p":
+        if (hasGh && isInsideCmux()) {
+          const slug = branchToSlug(branch)
+          const prScript = `/tmp/workbench/${slug}.pr.sh`
+          const scriptContent = generatePrCreatorScript({ worktree, branch, slug })
+          writeFileSync(prScript, scriptContent)
+          chmodSync(prScript, 0o755)
+          openInBottomPane(`zsh '${prScript}'`)
+        }
+        break
       case "t":
         if (isInsideCmux()) {
           openInBottomPane(`cd '${worktree}' && exec $SHELL`)
@@ -359,12 +384,15 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       <box style={{ flexDirection: "row", gap: 0 }}>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">f</span>{" file picker"}</text>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">g</span>{" lazygit"}</text>
-        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">t</span>{" terminal"}</text>
       </box>
       <box style={{ flexDirection: "row", gap: 0 }}>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">s</span>{" stage all"}</text>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">c</span>{" commit"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">p</span>{" pull request"}</text>
+      </box>
+      <box style={{ flexDirection: "row", gap: 0 }}>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">x</span>{" run app"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">t</span>{" terminal"}</text>
       </box>
       {hasClaudeReview && (
         <box style={{ flexDirection: "row", gap: 0 }}>
@@ -380,6 +408,11 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         {selectedFile ? <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">esc</span>{" deselect"}</text> : null}
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">q</span>{" quit"}</text>
       </box>
+      {prUrl && (
+        <box style={{ paddingTop: 1 }}>
+          <text>{"  "}<span fg="#22c55e">{"PR "}</span><span fg="#06b6d4">{prUrl}</span></text>
+        </box>
+      )}
       {alert && (
         <box style={{ paddingTop: 1 }}>
           <text fg={alert.color}>{"  " + alert.message}</text>
