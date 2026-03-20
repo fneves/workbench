@@ -259,7 +259,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         if (hasClaudeReview && !reviewLoading) {
           setReviewLoading(true)
           setReviewReady(false)
-          const fileScope = selectedFile ? `Run git diff HEAD -- '${selectedFile.path}' to examine the changes in ${selectedFile.path}.` : `Run git diff HEAD to examine the current changes.`
+          const fileScope = selectedFile ? `Run git diff main -- '${selectedFile.path}' to examine the changes in ${selectedFile.path}.` : `Run git diff main to examine the current changes.`
           const prompt = `You are an adversarial code reviewer. ${fileScope} Write a thorough review covering: bugs and logic errors, security vulnerabilities, missing edge cases and error handling, performance concerns, and code quality issues. Format as markdown with specific file and line references. Be critical and actionable.`
           const escaped = prompt.replace(/'/g, "'\\''")
           Bun.spawn(["sh", "-c", `cd '${worktree}' && claude '${escaped}' > '${reviewFilePath}' && touch '${reviewSentinelPath}'`], {
