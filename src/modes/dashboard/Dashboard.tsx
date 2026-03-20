@@ -260,7 +260,7 @@ function Dashboard() {
 }
 
 export async function runDashboard(): Promise<void> {
-  const renderer = await createCliRenderer()
+  const renderer = await createCliRenderer({ useMouse: false })
   registerTuiRenderer(renderer)
   installTuiCleanup()
   createRoot(renderer).render(<Dashboard />)

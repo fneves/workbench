@@ -277,7 +277,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       case "s":
         Bun.spawnSync(["git", "add", "-A"], { cwd: worktree })
         break
-      case "c":
+      case "C":
         if (isInsideCmux()) {
           openInBottomPane(
             `cd '${worktree}' && git add -A && echo 'Enter commit message:' && read -r msg && git commit -m "$msg"`,
@@ -387,7 +387,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       </box>
       <box style={{ flexDirection: "row", gap: 0 }}>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">s</span>{" stage all"}</text>
-        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">c</span>{" commit"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">C</span>{" commit"}</text>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">p</span>{" pull request"}</text>
       </box>
       <box style={{ flexDirection: "row", gap: 0 }}>
@@ -428,7 +428,7 @@ export async function runWatcher(worktree: string, branch: string): Promise<void
     branch = basename(worktree)
   }
 
-  const renderer = await createCliRenderer()
+  const renderer = await createCliRenderer({ useMouse: false })
   registerTuiRenderer(renderer)
   installTuiCleanup()
   createRoot(renderer).render(<WatcherApp worktree={worktree} branch={branch} />)
