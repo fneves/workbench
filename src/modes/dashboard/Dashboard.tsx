@@ -4,11 +4,10 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import { resolve } from "path"
 
 import { notify } from "../../lib/notify"
-import { isInsideCmux, selectWorkspace } from "../../lib/cmux"
-import { getScriptDir } from "../../lib/config"
+import { isInsideCmux, selectWorkspace, listWorkspaces, newWorkspace, splitPane, sendText, listSurfaces, waitForSurface } from "../../lib/cmux"
+import { updateState, reconcileWorktrees, type TaskState } from "../../lib/state"
+import { getScriptDir, getNotificationSound, getDashboardPollMs } from "../../lib/config"
 import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
-import { getNotificationSound, getDashboardPollMs } from "../../lib/config"
-import { reconcileWorktrees } from "../../lib/state"
 
 import { useTaskState } from "../../hooks/useTaskState"
 import { useAlert } from "../../hooks/useAlert"
@@ -113,6 +112,58 @@ function Dashboard() {
     [pushEvent, setAlert],
   )
 
+  const handleJump = useCallback(
+    async (task: TaskState) => {
+      const wsId = task.cmux_workspace_id
+      if (!wsId) return
+
+      // Check if the workspace still exists in cmux
+      const workspaces = await listWorkspaces()
+      const exists = workspaces.some((w) => w.id === wsId)
+
+      if (exists) {
+        await selectWorkspace(wsId)
+        return
+      }
+
+      // Workspace was closed — reopen it
+      setPendingOp(`reopening ${task.branch}`)
+      setAlert(`◌ Reopening ${task.branch}...`, "#3b82f6", 0, false)
+
+      const newWsId = await newWorkspace(task.branch)
+      if (!newWsId) {
+        setAlert(`✗ Failed to reopen workspace for ${task.branch}`, "#ef4444", 4, false)
+        setPendingOp(null)
+        return
+      }
+
+      await selectWorkspace(newWsId)
+      await updateState(task.branch, { cmux_workspace_id: newWsId })
+
+      // Wait for the default terminal and launch the watcher
+      const surfaces = await listSurfaces(newWsId)
+      const defaultSurface = surfaces.find((s) => s.type === "terminal")
+      if (defaultSurface) {
+        await waitForSurface(defaultSurface.id)
+        await updateState(task.branch, { cmux_agent_surface_id: defaultSurface.id })
+        // cd into the worktree so the user lands in the right directory
+        await sendText(`cd '${task.worktree}'\n`, defaultSurface.id)
+      }
+
+      // Create a right split for the watcher TUI
+      const watcherSurfaceId = await splitPane("right", newWsId)
+      if (watcherSurfaceId) {
+        await waitForSurface(watcherSurfaceId)
+        await sendText(`workbench watcher '${task.worktree}' '${task.branch}'\n`, watcherSurfaceId)
+      }
+
+      setPendingOp(null)
+      pushEvent("↩", `Reopened workspace for ${task.branch}`)
+      setAlert(`✓ Reopened ${task.branch}`, "#3b82f6", 3, false)
+    },
+    [pushEvent, setAlert],
+  )
+
   const handleKill = useCallback(
     async (branch: string) => {
       setPendingOp(`killing ${branch}`)
@@ -160,8 +211,7 @@ function Dashboard() {
         break
       case "return":
         if (isInsideCmux() && tasks[selected]) {
-          const wsId = tasks[selected]!.cmux_workspace_id
-          if (wsId) selectWorkspace(wsId)
+          handleJump(tasks[selected]!)
         }
         break
     }

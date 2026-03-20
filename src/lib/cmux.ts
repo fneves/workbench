@@ -102,8 +102,10 @@ export async function closeWorkspace(workspaceId: string): Promise<boolean> {
 
 // --- Surface/pane management ---
 
-export async function splitPane(direction: "right" | "left" | "up" | "down" = "right"): Promise<string | null> {
-  const res = await cmuxRequest("surface.split", { direction })
+export async function splitPane(direction: "right" | "left" | "up" | "down" = "right", workspaceId?: string): Promise<string | null> {
+  const params: Record<string, any> = { direction }
+  if (workspaceId) params.workspace_id = workspaceId
+  const res = await cmuxRequest("surface.split", params)
   if (!res?.ok) return null
   return res.result?.surface_id ?? null
 }
@@ -169,8 +171,10 @@ interface SurfaceInfo {
   focused: boolean
 }
 
-export async function listSurfaces(): Promise<SurfaceInfo[]> {
-  const res = await cmuxRequest("surface.list")
+export async function listSurfaces(workspaceId?: string): Promise<SurfaceInfo[]> {
+  const params: Record<string, any> = {}
+  if (workspaceId) params.workspace_id = workspaceId
+  const res = await cmuxRequest("surface.list", params)
   if (!res?.ok) return []
   return res.result?.surfaces ?? []
 }

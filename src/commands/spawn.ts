@@ -277,18 +277,24 @@ async function launchInCmux(
   await updateState(branch, { cmux_workspace_id: activeWsId })
 
   // Wait for the workspace's default terminal to be ready
-  const surfaces = await listSurfaces()
+  // Scope listSurfaces to this workspace to avoid races with parallel spawns
+  const surfaces = await listSurfaces(activeWsId)
   const defaultSurface = surfaces.find((s) => s.type === "terminal")
   if (defaultSurface) {
     await waitForSurface(defaultSurface.id)
     await updateState(branch, { cmux_agent_surface_id: defaultSurface.id })
   }
 
-  // Send the command to the new workspace's terminal
-  await sendText(`${cmd}\n`)
+  // Send the command to this workspace's terminal using explicit surface ID
+  // to avoid sending to the wrong workspace when spawning in parallel
+  if (defaultSurface) {
+    await sendText(`${cmd}\n`, defaultSurface.id)
+  } else {
+    await sendText(`${cmd}\n`)
+  }
 
-  // Create a right split for the watcher TUI
-  const watcherSurfaceId = await splitPane("right")
+  // Create a right split scoped to this workspace
+  const watcherSurfaceId = await splitPane("right", activeWsId)
   if (watcherSurfaceId) {
     await waitForSurface(watcherSurfaceId)
     await sendText(`workbench watcher '${worktreeDir}' '${branch}'\n`, watcherSurfaceId)
