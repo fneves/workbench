@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useKeyboard } from "@opentui/react"
-import { getDefaultAgent, getDefaultBaseBranch, getDefaultMode } from "../../lib/config"
+import { getDefaultAgent, getDefaultBaseBranch } from "../../lib/config"
 
 export interface SpawnOpts {
   branch: string
@@ -18,9 +18,10 @@ interface SpawnDialogProps {
 
 type Step = "branch" | "interactive" | "prompt" | "agent"
 
-const INTERACTIVE_OPTS = [
+const MODE_OPTS = [
   { label: "interactive", desc: "agent opens in terminal, no prompt" },
   { label: "with prompt", desc: "provide a task description" },
+  { label: "container", desc: "runs autonomously in a devcontainer" },
 ]
 
 const AGENT_OPTS = [
@@ -63,7 +64,7 @@ function SelectList({
 export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
   const [step, setStep] = useState<Step>("branch")
   const [branch, setBranch] = useState("")
-  const [interactive, setInteractive] = useState(0) // 0=interactive, 1=with prompt
+  const [modeIdx, setModeIdx] = useState(0) // 0=interactive, 1=with prompt, 2=container
   const [prompt, setPrompt] = useState("")
   const defaultAgentIdx = AGENT_OPTS.findIndex((o) => o.value === getDefaultAgent())
   const [agentIdx, setAgentIdx] = useState(defaultAgentIdx >= 0 ? defaultAgentIdx : 0)
@@ -79,9 +80,9 @@ export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
 
   useKeyboard((key) => {
     if (step === "interactive") {
-      if (key.name === "up") setInteractive((i) => Math.max(0, i - 1))
-      else if (key.name === "down") setInteractive((i) => Math.min(1, i + 1))
-      else if (key.name === "return") setStep(interactive === 0 ? "agent" : "prompt")
+      if (key.name === "up") setModeIdx((i) => Math.max(0, i - 1))
+      else if (key.name === "down") setModeIdx((i) => Math.min(MODE_OPTS.length - 1, i + 1))
+      else if (key.name === "return") setStep(modeIdx === 0 ? "agent" : "prompt")
       else if (key.name === "escape") onCancel()
     } else if (step === "agent") {
       if (key.name === "up") setAgentIdx((i) => Math.max(0, i - 1))
@@ -89,11 +90,11 @@ export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
       else if (key.name === "return") {
         onSpawn({
           branch: branch.trim(),
-          prompt: interactive === 1 ? prompt.trim() : "",
+          prompt: modeIdx !== 0 ? prompt.trim() : "",
           agent: AGENT_OPTS[agentIdx]!.value,
-          mode: getDefaultMode(),
+          mode: modeIdx === 2 ? "container" : "worktree",
           baseBranch: getDefaultBaseBranch(),
-          interactive: interactive === 0,
+          interactive: modeIdx === 0,
         })
       } else if (key.name === "escape") onCancel()
     }
@@ -108,7 +109,7 @@ export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
       <text>
         <span fg={stepColor("branch")}>{"branch"}</span>
         <span fg={stepColor("interactive")}>{" → mode"}</span>
-        <span fg={interactive === 1 ? stepColor("prompt") : "#333333"}>{" → prompt"}</span>
+        <span fg={modeIdx !== 0 ? stepColor("prompt") : "#333333"}>{" → prompt"}</span>
         <span fg={stepColor("agent")}>{" → agent"}</span>
       </text>
 
@@ -126,7 +127,7 @@ export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
       )}
 
       {step === "interactive" && (
-        <SelectList label="Mode:" options={INTERACTIVE_OPTS} selected={interactive} />
+        <SelectList label="Mode:" options={MODE_OPTS} selected={modeIdx} />
       )}
 
       {step === "prompt" && (
