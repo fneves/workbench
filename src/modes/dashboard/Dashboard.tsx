@@ -168,6 +168,7 @@ function Dashboard() {
     async (branch: string) => {
       setPendingOp(`killing ${branch}`)
       setAlert(`◌ Killing ${branch}...`, "#eab308", 0, false)
+      await updateState(branch, { status: "killing" })
       const result = await runWorkbenchCmd(["kill", branch])
       setPendingOp(null)
       if (result.ok) {

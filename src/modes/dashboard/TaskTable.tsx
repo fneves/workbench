@@ -13,6 +13,8 @@ function StatusIcon({ status }: { status: TaskState["status"] }) {
       return <text fg="#ef4444">✗</text>
     case "starting":
       return <text fg="#3b82f6">◔</text>
+    case "killing":
+      return <Spinner color="#ef4444" />
     default:
       return <text fg="#666">?</text>
   }
@@ -24,6 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
   done: "#06b6d4",
   failed: "#ef4444",
   starting: "#3b82f6",
+  killing: "#ef4444",
   unknown: "#666",
 }
 

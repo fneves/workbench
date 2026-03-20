@@ -6,7 +6,7 @@ import { isProcessAlive } from "./process"
 
 export interface TaskState {
   branch: string
-  status: "starting" | "running" | "prompting" | "done" | "failed" | "unknown"
+  status: "starting" | "running" | "prompting" | "done" | "failed" | "killing" | "unknown"
   agent: "claude" | "opencode"
   mode: "worktree" | "container"
   worktree: string
