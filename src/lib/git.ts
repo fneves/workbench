@@ -30,6 +30,10 @@ export function createWorktree(
   if (result.ok) return true
   // Try checking out existing branch
   result = run(["git", "-C", repo, "worktree", "add", worktreeDir, branch])
+  if (result.ok) {
+    // Set upstream tracking for existing branches
+    run(["git", "-C", worktreeDir, "branch", "--set-upstream-to", `origin/${branch}`])
+  }
   return result.ok
 }
 

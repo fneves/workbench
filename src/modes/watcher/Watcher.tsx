@@ -284,6 +284,11 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           )
         }
         break
+      case "P":
+        if (isInsideCmux()) {
+          openInBottomPane(`cd '${worktree}' && git push`)
+        }
+        break
       case "p":
         if (hasGh && isInsideCmux()) {
           const slug = branchToSlug(branch)
@@ -388,9 +393,10 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       <box style={{ flexDirection: "row", gap: 0 }}>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">s</span>{" stage all"}</text>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">C</span>{" commit"}</text>
-        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">p</span>{" pull request"}</text>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">P</span>{" push"}</text>
       </box>
       <box style={{ flexDirection: "row", gap: 0 }}>
+        <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">p</span>{" pull request"}</text>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">x</span>{" run app"}</text>
         <text style={{ width: 20 }}>{"  "}<span fg="#06b6d4">t</span>{" terminal"}</text>
       </box>
