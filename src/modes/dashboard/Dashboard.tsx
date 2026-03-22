@@ -2,7 +2,6 @@ import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard } from "@opentui/react";
 import { useState, useCallback, useEffect } from "react";
 
-import { isInsideCmux } from "../../lib/cmux";
 import type { TaskState } from "../../lib/state";
 import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui";
 
@@ -31,6 +30,24 @@ function Dashboard() {
   const [selected, setSelected] = useState(0);
   const [showSpawn, setShowSpawn] = useState(false);
   const [pendingOp, setPendingOp] = useState<string | null>(null);
+  const [configDefaults, setConfigDefaults] = useState<{
+    agent: "claude" | "opencode";
+    baseBranch: string;
+  }>({ agent: "claude", baseBranch: "main" });
+
+  // Fetch config defaults on mount
+  useEffect(() => {
+    request("config.get")
+      .then((r: any) => {
+        if (r) {
+          setConfigDefaults({
+            agent: r.agent ?? "claude",
+            baseBranch: r.base_branch ?? "main",
+          });
+        }
+      })
+      .catch(() => {});
+  }, [request]);
 
   // Subscribe to task transitions for alerts + event log
   useEffect(() => {
@@ -209,7 +226,7 @@ function Dashboard() {
         setSelected((s) => Math.min(tasks.length - 1, s + 1));
         break;
       case "return":
-        if (isInsideCmux() && tasks[selected]) {
+        if (process.env.CMUX_WORKSPACE_ID && tasks[selected]) {
           handleJump(tasks[selected]!);
         }
         break;
@@ -220,7 +237,12 @@ function Dashboard() {
     return (
       <box style={{ flexDirection: "column", padding: 1 }}>
         <Header />
-        <SpawnDialog onSpawn={handleSpawn} onCancel={() => setShowSpawn(false)} />
+        <SpawnDialog
+          onSpawn={handleSpawn}
+          onCancel={() => setShowSpawn(false)}
+          defaultAgent={configDefaults.agent}
+          defaultBaseBranch={configDefaults.baseBranch}
+        />
       </box>
     );
   }

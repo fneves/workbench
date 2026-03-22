@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useKeyboard } from "@opentui/react";
-import { getDefaultAgent, getDefaultBaseBranch } from "../../lib/config";
 
 export interface SpawnOpts {
   branch: string;
@@ -14,6 +13,8 @@ export interface SpawnOpts {
 interface SpawnDialogProps {
   onSpawn: (opts: SpawnOpts) => void;
   onCancel: () => void;
+  defaultAgent?: "claude" | "opencode";
+  defaultBaseBranch?: string;
 }
 
 type Step = "branch" | "interactive" | "prompt" | "agent";
@@ -61,12 +62,17 @@ function SelectList({
   );
 }
 
-export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
+export function SpawnDialog({
+  onSpawn,
+  onCancel,
+  defaultAgent = "claude",
+  defaultBaseBranch = "main",
+}: SpawnDialogProps) {
   const [step, setStep] = useState<Step>("branch");
   const [branch, setBranch] = useState("");
   const [modeIdx, setModeIdx] = useState(0); // 0=interactive, 1=with prompt, 2=container
   const [prompt, setPrompt] = useState("");
-  const defaultAgentIdx = AGENT_OPTS.findIndex((o) => o.value === getDefaultAgent());
+  const defaultAgentIdx = AGENT_OPTS.findIndex((o) => o.value === defaultAgent);
   const [agentIdx, setAgentIdx] = useState(defaultAgentIdx >= 0 ? defaultAgentIdx : 0);
 
   const stepColor = (s: Step): string => {
@@ -93,7 +99,7 @@ export function SpawnDialog({ onSpawn, onCancel }: SpawnDialogProps) {
           prompt: modeIdx !== 0 ? prompt.trim() : "",
           agent: AGENT_OPTS[agentIdx]!.value,
           mode: modeIdx === 2 ? "container" : "worktree",
-          baseBranch: getDefaultBaseBranch(),
+          baseBranch: defaultBaseBranch,
           interactive: modeIdx === 0,
         });
       } else if (key.name === "escape") onCancel();

@@ -9,7 +9,9 @@
     "lint:fix": "oxlint --fix src/",
     "fmt": "oxfmt src/",
     "fmt:check": "oxfmt --check src/",
-    "check": "bun run typecheck && bun run lint && bun run fmt:check"
+    "check": "bun run typecheck && bun run lint && bun run fmt:check",
+    "build": "bun build --compile src/index.tsx --outfile dist/workbench",
+    "install:local": "bun run build && ln -sf $(pwd)/dist/workbench ~/.local/bin/workbench"
   },
   "dependencies": {
     "@opentui/core": "^0.1.88",

@@ -21,11 +21,21 @@ import { generatePrCreatorScript } from "../templates/pr-creator";
 
 type Handler = (params: Record<string, any>) => Promise<any>;
 
-function runWorkbenchCmd(args: string[]): Promise<{ ok: boolean; stderr: string }> {
+function getWorkbenchCommand(args: string[]): string[] {
+  // When compiled to a binary, process.execPath IS the workbench binary
+  const isCompiled = !process.execPath.endsWith("bun") && !process.execPath.endsWith("node");
+  if (isCompiled) {
+    return [process.execPath, ...args];
+  }
+  // Dev mode: run via bun
   const entryPoint = resolve(getScriptDir(), "src/index.tsx");
   const bunPath = Bun.which("bun") ?? "bun";
+  return [bunPath, "run", entryPoint, ...args];
+}
+
+function runWorkbenchCmd(args: string[]): Promise<{ ok: boolean; stderr: string }> {
   return new Promise((resolve) => {
-    const proc = Bun.spawn([bunPath, "run", entryPoint, ...args], {
+    const proc = Bun.spawn(getWorkbenchCommand(args), {
       stdout: "ignore",
       stderr: "pipe",
     });

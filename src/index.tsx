@@ -20,6 +20,7 @@ function usage(): void {
   console.log(`  ${C.cyan}workbench list${C.nc}        List active tasks`);
   console.log(`  ${C.cyan}workbench kill${C.nc}        Kill a task and clean up worktree`);
   console.log(`  ${C.cyan}workbench cleanup${C.nc}     Tear down everything`);
+  console.log(`  ${C.cyan}workbench doctor${C.nc}      Check dependencies and environment`);
   console.log(`  ${C.cyan}workbench dashboard${C.nc}   TUI dashboard (runs in cmux workspace)`);
   console.log(`  ${C.cyan}workbench watcher${C.nc}     TUI watcher (runs in cmux workspace)`);
   console.log();
@@ -57,6 +58,11 @@ switch (command) {
   case "cleanup": {
     const { cmdCleanup } = await import("./commands/cleanup");
     await cmdCleanup();
+    break;
+  }
+  case "doctor": {
+    const { cmdDoctor } = await import("./commands/doctor");
+    cmdDoctor();
     break;
   }
   case "dashboard": {

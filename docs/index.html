@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>workbench — multi-agent orchestrator</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --fg: #e2e8f0;
+      --dim: #64748b;
+      --accent: #a855f7;
+      --cyan: #06b6d4;
+      --green: #22c55e;
+      --border: #1e293b;
+      --code-bg: #111318;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4rem 1.5rem;
+    }
+    .container { max-width: 640px; width: 100%; }
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    h1 span { color: var(--accent); }
+    .tagline {
+      color: var(--dim);
+      font-size: 1.1rem;
+      margin-bottom: 2.5rem;
+    }
+    .install-box {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+    .install-box code {
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+      font-size: 0.95rem;
+      color: var(--cyan);
+      word-break: break-all;
+    }
+    .install-box .copy-btn {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: var(--border);
+      border: none;
+      color: var(--dim);
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+    .install-box .copy-btn:hover { color: var(--fg); background: #2a3040; }
+    .section { margin-bottom: 2rem; }
+    .section h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--fg);
+    }
+    .section p, .section li {
+      color: var(--dim);
+      font-size: 0.95rem;
+    }
+    .section ul {
+      list-style: none;
+      padding: 0;
+    }
+    .section li {
+      padding: 0.25rem 0;
+    }
+    .section li::before {
+      content: "→ ";
+      color: var(--accent);
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 3px;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+    .badge.required { background: #7c3aed22; color: var(--accent); }
+    .badge.optional { background: #06b6d422; color: var(--cyan); }
+    .footer {
+      margin-top: 3rem;
+      color: var(--dim);
+      font-size: 0.85rem;
+    }
+    .footer a { color: var(--accent); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    code.inline {
+      font-family: "SF Mono", "Fira Code", monospace;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+      color: var(--cyan);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><span>⚡</span> workbench</h1>
+    <p class="tagline">Run multiple AI coding agents in parallel, each in its own git worktree, orchestrated from a terminal dashboard.</p>
+
+    <div class="install-box">
+      <code>curl -fsSL https://fneves.github.io/workbench/install.sh | sh</code>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('curl -fsSL https://fneves.github.io/workbench/install.sh | sh');this.textContent='copied!';setTimeout(()=>this.textContent='copy',1500)">copy</button>
+    </div>
+
+    <div class="section">
+      <h2>What it does</h2>
+      <ul>
+        <li>Spawns AI agents (Claude Code, OpenCode) in isolated git worktrees</li>
+        <li>Dashboard TUI shows all tasks, status transitions, diff stats</li>
+        <li>Per-task watcher with code review, diff viewer, git shortcuts</li>
+        <li>Notifications when agents finish, need input, or fail</li>
+        <li>Optional devcontainer mode for headless agents</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Requirements</h2>
+      <ul>
+        <li><code class="inline">cmux</code> — terminal multiplexer <span class="badge required">required</span></li>
+        <li><code class="inline">git</code> <span class="badge required">required</span></li>
+        <li><code class="inline">jq</code> <span class="badge required">required</span></li>
+        <li><code class="inline">claude</code> or <code class="inline">opencode</code> — AI agent <span class="badge required">required</span></li>
+        <li><code class="inline">gh</code> <code class="inline">fzf</code> <code class="inline">lazygit</code> <code class="inline">delta</code> <code class="inline">bat</code> <span class="badge optional">optional</span></li>
+      </ul>
+      <p style="margin-top: 0.5rem">The installer auto-installs what it can via Homebrew (macOS) or apt (Linux).</p>
+    </div>
+
+    <div class="section">
+      <h2>Quick start</h2>
+      <ul>
+        <li>Open <code class="inline">cmux</code></li>
+        <li>Run <code class="inline">workbench start</code></li>
+        <li>Press <code class="inline">n</code> to spawn a new task</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Verify install</h2>
+      <div class="install-box" style="margin-bottom: 0">
+        <code>workbench doctor</code>
+      </div>
+    </div>
+
+    <div class="footer">
+      <a href="https://github.com/fneves/workbench">GitHub</a> ·
+      <a href="https://github.com/fneves/workbench/releases">Releases</a>
+    </div>
+  </div>
+</body>
+</html>

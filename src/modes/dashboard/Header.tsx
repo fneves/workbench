@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { WORKBENCH_STATE_DIR } from "../../lib/config";
 import { useInterval } from "../../hooks/useInterval";
 
 export function Header() {
@@ -13,7 +12,7 @@ export function Header() {
   useEffect(() => {
     const loadRepo = async () => {
       try {
-        const file = Bun.file(`${WORKBENCH_STATE_DIR}/.repo`);
+        const file = Bun.file("/tmp/workbench/.repo");
         if (await file.exists()) {
           const path = (await file.text()).trim();
           setRepoName(path.split("/").pop() ?? "no repo");
