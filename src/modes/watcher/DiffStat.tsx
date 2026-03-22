@@ -1,5 +1,5 @@
 import { useTerminalDimensions } from "@opentui/react";
-import type { FileChange, FileStatus } from "../../lib/git";
+import type { FileChange, FileStatus } from "#lib/git";
 
 export type { FileChange };
 

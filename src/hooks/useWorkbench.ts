@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import type { WorkbenchClient } from "../client";
-import type { TaskState } from "../lib/state";
-import type { FileChange } from "../lib/git";
-import type { Response } from "../server/types";
+import type { WorkbenchClient } from "#client";
+import type { TaskState } from "#lib/state";
+import type { FileChange } from "#lib/git";
+import type { Response } from "#server/types";
 
 // --- Context ---
 

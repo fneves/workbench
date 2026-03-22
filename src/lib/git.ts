@@ -1,4 +1,4 @@
-import { getRepoRoot } from "./config";
+import { getRepoRoot } from "#lib/config";
 
 function run(args: string[], cwd?: string): { ok: boolean; stdout: string } {
   const result = Bun.spawnSync(args, { cwd });

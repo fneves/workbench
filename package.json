@@ -2,6 +2,18 @@
   "name": "workbench",
   "version": "1.0.0",
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*.ts",
+    "#server": "./src/server/index.ts",
+    "#server/*": "./src/server/*.ts",
+    "#client": "./src/client/index.ts",
+    "#hooks/*": "./src/hooks/*.ts",
+    "#commands/*": "./src/commands/*.ts",
+    "#components/*": "./src/components/*.tsx",
+    "#templates/*": "./src/templates/*.ts",
+    "#modes/dashboard/*": "./src/modes/dashboard/*.tsx",
+    "#modes/watcher/*": "./src/modes/watcher/*.tsx"
+  },
   "scripts": {
     "dev": "bun run src/index.tsx",
     "typecheck": "tsc --noEmit",

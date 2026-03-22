@@ -15,7 +15,16 @@
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "#lib/*": ["./src/lib/*"],
+      "#server": ["./src/server/index.ts"],
+      "#server/*": ["./src/server/*"],
+      "#client": ["./src/client/index.ts"],
+      "#hooks/*": ["./src/hooks/*"],
+      "#commands/*": ["./src/commands/*"],
+      "#components/*": ["./src/components/*"],
+      "#templates/*": ["./src/templates/*"],
+      "#modes/dashboard/*": ["./src/modes/dashboard/*"],
+      "#modes/watcher/*": ["./src/modes/watcher/*"]
     }
   },
   "include": ["src/**/*"]

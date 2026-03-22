@@ -1,5 +1,5 @@
-import type { TaskState } from "../../lib/state";
-import { Spinner } from "../../components/Spinner";
+import type { TaskState } from "#lib/state";
+import { Spinner } from "#components/Spinner";
 import { useTerminalDimensions } from "@opentui/react";
 
 const STATUS_CONFIG: Record<string, { icon: string; label: string; bg: string }> = {

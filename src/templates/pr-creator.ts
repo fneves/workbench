@@ -1,4 +1,4 @@
-import { getDefaultEditor } from "../lib/config";
+import { getDefaultEditor } from "#lib/config";
 
 /**
  * Generate a shell script that handles the full PR creation flow:

@@ -3,13 +3,13 @@ import {
   getNotificationSoundsEnabled,
   getNotificationSound,
   getDiffPollSec,
-} from "../lib/config";
+} from "#lib/config";
 import {
   shellUpdateState,
   shellUpdateDiffStats,
   shellNotify,
   shellDiffPoller,
-} from "./shell-helpers";
+} from "#templates/shell-helpers";
 
 export function generateAgentWrapper(opts: {
   stateFile: string;

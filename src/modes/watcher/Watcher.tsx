@@ -2,19 +2,19 @@ import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
-import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui";
-import { useAlert } from "../../hooks/useAlert";
-import { useInterval } from "../../hooks/useInterval";
+import { exitTui, installTuiCleanup, registerTuiRenderer } from "#lib/tui";
+import { useAlert } from "#hooks/useAlert";
+import { useInterval } from "#hooks/useInterval";
 import {
   useTask,
   useFileChanges,
   useRequest,
   useWorkbenchClient,
   WorkbenchClientContext,
-} from "../../hooks/useWorkbench";
+} from "#hooks/useWorkbench";
 
-import { StatusBar } from "./StatusBar";
-import { DiffStat } from "./DiffStat";
+import { StatusBar } from "#modes/watcher/StatusBar";
+import { DiffStat } from "#modes/watcher/DiffStat";
 
 const REVIEW_OPTS = [
   { label: "accept", desc: "write review file + send to agent" },
@@ -512,7 +512,7 @@ export async function runWatcher(worktree: string, branch: string): Promise<void
     branch = basename(worktree);
   }
 
-  const { WorkbenchClient } = await import("../../client");
+  const { WorkbenchClient } = await import("#client");
 
   const client = new WorkbenchClient();
   const connected = await client.connect();

@@ -1,5 +1,5 @@
-import { getDiffPollSec } from "../lib/config";
-import { shellUpdateState, shellUpdateDiffStats, shellDiffPoller } from "./shell-helpers";
+import { getDiffPollSec } from "#lib/config";
+import { shellUpdateState, shellUpdateDiffStats, shellDiffPoller } from "#templates/shell-helpers";
 
 /**
  * Generate a shell script for running Claude Code headlessly inside a devcontainer.

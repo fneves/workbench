@@ -1,4 +1,4 @@
-import type { Alert } from "../../hooks/useAlert";
+import type { Alert } from "#hooks/useAlert";
 import { useTerminalDimensions } from "@opentui/react";
 
 export function AlertBar({ alert }: { alert: Alert | null }) {

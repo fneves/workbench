@@ -1,5 +1,5 @@
-import { readState } from "../lib/state";
-import { doCleanupTask } from "./cleanup";
+import { readState } from "#lib/state";
+import { doCleanupTask } from "#commands/cleanup";
 
 const C = {
   red: "\x1b[0;31m",

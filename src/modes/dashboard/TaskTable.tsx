@@ -1,5 +1,5 @@
-import type { TaskState } from "../../lib/state";
-import { Spinner } from "../../components/Spinner";
+import type { TaskState } from "#lib/state";
+import { Spinner } from "#components/Spinner";
 
 function StatusIcon({ status }: { status: TaskState["status"] }) {
   switch (status) {

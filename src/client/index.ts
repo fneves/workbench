@@ -1,5 +1,5 @@
 import { Socket } from "net";
-import { SERVER_SOCKET_PATH, type Response } from "../server/types";
+import { SERVER_SOCKET_PATH, type Response } from "#server/types";
 
 type EventHandler = (data: any) => void;
 

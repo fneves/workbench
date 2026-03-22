@@ -2,24 +2,24 @@ import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard } from "@opentui/react";
 import { useState, useCallback, useEffect } from "react";
 
-import type { TaskState } from "../../lib/state";
-import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui";
+import type { TaskState } from "#lib/state";
+import { exitTui, installTuiCleanup, registerTuiRenderer } from "#lib/tui";
 
 import {
   useTaskList,
   useRequest,
   useWorkbenchClient,
   WorkbenchClientContext,
-} from "../../hooks/useWorkbench";
-import { useAlert } from "../../hooks/useAlert";
-import { useEventLog } from "../../hooks/useEventLog";
+} from "#hooks/useWorkbench";
+import { useAlert } from "#hooks/useAlert";
+import { useEventLog } from "#hooks/useEventLog";
 
-import { Header } from "./Header";
-import { AlertBar } from "./AlertBar";
-import { TaskTable } from "./TaskTable";
-import { EventLog } from "./EventLog";
-import { SpawnDialog } from "./SpawnDialog";
-import { Spinner } from "../../components/Spinner";
+import { Header } from "#modes/dashboard/Header";
+import { AlertBar } from "#modes/dashboard/AlertBar";
+import { TaskTable } from "#modes/dashboard/TaskTable";
+import { EventLog } from "#modes/dashboard/EventLog";
+import { SpawnDialog } from "#modes/dashboard/SpawnDialog";
+import { Spinner } from "#components/Spinner";
 
 function Dashboard() {
   const client = useWorkbenchClient();
@@ -286,7 +286,7 @@ function Dashboard() {
 }
 
 export async function runDashboard(): Promise<void> {
-  const { WorkbenchClient } = await import("../../client");
+  const { WorkbenchClient } = await import("#client");
 
   const client = new WorkbenchClient();
   const connected = await client.connect();

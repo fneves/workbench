@@ -6,7 +6,7 @@ import {
   branchToSlug,
   getContainerImage,
   getContainerClaudeHome,
-} from "./config";
+} from "#lib/config";
 
 /**
  * Try to extract the Claude Code API key from the macOS Keychain.

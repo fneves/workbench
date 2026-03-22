@@ -36,44 +36,44 @@ const [command, ...args] = process.argv.slice(2);
 
 switch (command) {
   case "start": {
-    const { cmdStart } = await import("./commands/start");
+    const { cmdStart } = await import("#commands/start");
     await cmdStart();
     break;
   }
   case "spawn": {
-    const { cmdSpawn } = await import("./commands/spawn");
+    const { cmdSpawn } = await import("#commands/spawn");
     await cmdSpawn(args);
     break;
   }
   case "list": {
-    const { cmdList } = await import("./commands/list");
+    const { cmdList } = await import("#commands/list");
     await cmdList();
     break;
   }
   case "kill": {
-    const { cmdKill } = await import("./commands/kill");
+    const { cmdKill } = await import("#commands/kill");
     await cmdKill(args[0] ?? "");
     break;
   }
   case "cleanup": {
-    const { cmdCleanup } = await import("./commands/cleanup");
+    const { cmdCleanup } = await import("#commands/cleanup");
     await cmdCleanup();
     break;
   }
   case "doctor": {
-    const { cmdDoctor } = await import("./commands/doctor");
+    const { cmdDoctor } = await import("#commands/doctor");
     cmdDoctor();
     break;
   }
   case "dashboard": {
-    const { reconcileWorktrees } = await import("./lib/state");
-    const { runDashboard } = await import("./modes/dashboard/Dashboard");
+    const { reconcileWorktrees } = await import("#lib/state");
+    const { runDashboard } = await import("#modes/dashboard/Dashboard");
     await reconcileWorktrees();
     await runDashboard();
     break;
   }
   case "watcher": {
-    const { runWatcher } = await import("./modes/watcher/Watcher");
+    const { runWatcher } = await import("#modes/watcher/Watcher");
     await runWatcher(args[0] ?? ".", args[1] ?? "");
     break;
   }

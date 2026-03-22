@@ -1,10 +1,10 @@
 import { existsSync, rmSync, unlinkSync } from "fs";
-import { WORKBENCH_STATE_DIR, getStateFile, branchToSlug } from "../lib/config";
-import { readState, listTasks } from "../lib/state";
-import { removeWorktree } from "../lib/git";
-import { killProcess, isProcessAlive } from "../lib/process";
-import { listWorkspaces, closeWorkspace, currentWorkspaceId } from "../lib/cmux";
-import { stopContainer, cleanupAllContainers } from "../lib/container";
+import { WORKBENCH_STATE_DIR, getStateFile, branchToSlug } from "#lib/config";
+import { readState, listTasks } from "#lib/state";
+import { removeWorktree } from "#lib/git";
+import { killProcess, isProcessAlive } from "#lib/process";
+import { listWorkspaces, closeWorkspace, currentWorkspaceId } from "#lib/cmux";
+import { stopContainer, cleanupAllContainers } from "#lib/container";
 
 const C = {
   red: "\x1b[0;31m",

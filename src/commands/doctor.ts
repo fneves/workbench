@@ -1,4 +1,4 @@
-import { isInsideCmux } from "../lib/cmux";
+import { isInsideCmux } from "#lib/cmux";
 
 const C = {
   green: "\x1b[0;32m",

@@ -6,9 +6,9 @@ import {
   getWorktreeDir,
   getStateFile,
   branchToSlug,
-} from "../lib/config";
-import { writeState, updateState, newTaskState } from "../lib/state";
-import { createWorktree } from "../lib/git";
+} from "#lib/config";
+import { writeState, updateState, newTaskState } from "#lib/state";
+import { createWorktree } from "#lib/git";
 import {
   isInsideCmux,
   findWorkspace,
@@ -18,15 +18,15 @@ import {
   sendText,
   listSurfaces,
   waitForSurface,
-} from "../lib/cmux";
-import { generateAgentWrapper } from "../templates/agent-wrapper";
-import { generateContainerAgentWrapper } from "../templates/container-agent-wrapper";
+} from "#lib/cmux";
+import { generateAgentWrapper } from "#templates/agent-wrapper";
+import { generateContainerAgentWrapper } from "#templates/container-agent-wrapper";
 import {
   isDevcontainerCliAvailable,
   isDockerRunning,
   generateDevcontainerConfig,
   writeDevcontainerConfig,
-} from "../lib/container";
+} from "#lib/container";
 
 const C = {
   red: "\x1b[0;31m",

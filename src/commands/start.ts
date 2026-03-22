@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from "fs";
-import { WORKBENCH_DIR, WORKBENCH_STATE_DIR, getRepoRoot } from "../lib/config";
-import { reconcileWorktrees } from "../lib/state";
-import { isInsideCmux } from "../lib/cmux";
-import { WorkbenchServer, isServerRunning } from "../server";
+import { WORKBENCH_DIR, WORKBENCH_STATE_DIR, getRepoRoot } from "#lib/config";
+import { reconcileWorktrees } from "#lib/state";
+import { isInsideCmux } from "#lib/cmux";
+import { WorkbenchServer, isServerRunning } from "#server";
 
 const C = {
   purple: "\x1b[0;35m",
@@ -63,6 +63,6 @@ export async function cmdStart(): Promise<void> {
   // Launch the dashboard — render is non-blocking, process stays alive
   // because OpenTUI holds stdin open in raw mode
   console.log(`${C.green}Launching dashboard...${C.nc}`);
-  const { runDashboard } = await import("../modes/dashboard/Dashboard");
+  const { runDashboard } = await import("#modes/dashboard/Dashboard");
   await runDashboard();
 }

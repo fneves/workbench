@@ -1,4 +1,4 @@
-import type { LogEntry } from "../../hooks/useEventLog";
+import type { LogEntry } from "#hooks/useEventLog";
 
 export function EventLog({ entries }: { entries: LogEntry[] }) {
   if (entries.length === 0) return <box />;

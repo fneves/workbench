@@ -1,6 +1,6 @@
 import { platform } from "os";
-import { cmuxNotify, isInsideCmux } from "./cmux";
-import { getNotificationsEnabled } from "./config";
+import { cmuxNotify, isInsideCmux } from "#lib/cmux";
+import { getNotificationsEnabled } from "#lib/config";
 
 export function notify(title: string, body: string, sound = "default", group = "workbench"): void {
   if (!getNotificationsEnabled()) return;

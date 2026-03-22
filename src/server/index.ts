@@ -1,14 +1,14 @@
 import { createServer, type Server, type Socket } from "net";
 import { existsSync, unlinkSync, readFileSync } from "fs";
 
-import { listTasks, type TaskState } from "../lib/state";
-import { getFileChanges } from "../lib/git";
-import { notify } from "../lib/notify";
-import { getNotificationSound, branchToSlug } from "../lib/config";
-import { handlers } from "./handlers";
-import { SERVER_SOCKET_PATH, type Request, type Event } from "./types";
+import { listTasks, type TaskState } from "#lib/state";
+import { getFileChanges } from "#lib/git";
+import { notify } from "#lib/notify";
+import { getNotificationSound, branchToSlug } from "#lib/config";
+import { handlers } from "#server/handlers";
+import { SERVER_SOCKET_PATH, type Request, type Event } from "#server/types";
 
-export { SERVER_SOCKET_PATH } from "./types";
+export { SERVER_SOCKET_PATH } from "#server/types";
 
 export class WorkbenchServer {
   private server: Server | null = null;

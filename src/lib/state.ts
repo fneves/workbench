@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from "fs";
 import { basename, resolve } from "path";
-import { WORKBENCH_STATE_DIR, getStateFile, getRepoRoot } from "./config";
-import { getDiffStats, getCurrentBranch } from "./git";
-import { isProcessAlive } from "./process";
+import { WORKBENCH_STATE_DIR, getStateFile, getRepoRoot } from "#lib/config";
+import { getDiffStats, getCurrentBranch } from "#lib/git";
+import { isProcessAlive } from "#lib/process";
 
 export interface TaskState {
   branch: string;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useInterval } from "../../hooks/useInterval";
+import { useInterval } from "#hooks/useInterval";
 
 export function Header() {
   const [time, setTime] = useState(new Date().toLocaleTimeString("en-GB", { hour12: false }));

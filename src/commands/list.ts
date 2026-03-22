@@ -1,4 +1,4 @@
-import { listTasks } from "../lib/state";
+import { listTasks } from "#lib/state";
 
 const C = {
   red: "\x1b[0;31m",

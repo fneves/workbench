@@ -1,8 +1,8 @@
 import { resolve } from "path";
 import { writeFileSync, chmodSync, unlinkSync } from "fs";
-import { listTasks, readState, updateState } from "../lib/state";
-import { getDiffStats, getFileChanges } from "../lib/git";
-import { getConfig, getScriptDir, branchToSlug, getDefaultEditor } from "../lib/config";
+import { listTasks, readState, updateState } from "#lib/state";
+import { getDiffStats, getFileChanges } from "#lib/git";
+import { getConfig, getScriptDir, branchToSlug, getDefaultEditor } from "#lib/config";
 import {
   selectWorkspace,
   splitPane,
@@ -16,8 +16,8 @@ import {
   newWorkspace,
   closeWorkspace,
   cmuxNotify,
-} from "../lib/cmux";
-import { generatePrCreatorScript } from "../templates/pr-creator";
+} from "#lib/cmux";
+import { generatePrCreatorScript } from "#templates/pr-creator";
 
 type Handler = (params: Record<string, any>) => Promise<any>;
 

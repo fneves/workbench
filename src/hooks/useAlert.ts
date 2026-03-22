@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { useInterval } from "./useInterval";
+import { useInterval } from "#hooks/useInterval";
 
 export interface Alert {
   message: string;
