@@ -1,9 +1,5 @@
-import { getDiffPollSec } from "../lib/config"
-import {
-  shellUpdateState,
-  shellUpdateDiffStats,
-  shellDiffPoller,
-} from "./shell-helpers"
+import { getDiffPollSec } from "../lib/config";
+import { shellUpdateState, shellUpdateDiffStats, shellDiffPoller } from "./shell-helpers";
 
 /**
  * Generate a shell script for running Claude Code headlessly inside a devcontainer.
@@ -16,13 +12,13 @@ import {
  * - No `exec zsh` at end — clean exit
  */
 export function generateContainerAgentWrapper(opts: {
-  stateFile: string
-  worktreeDir: string
-  branch: string
-  prompt: string
+  stateFile: string;
+  worktreeDir: string;
+  branch: string;
+  prompt: string;
 }): string {
-  const diffPollSec = getDiffPollSec()
-  const escaped = opts.prompt.replace(/'/g, "'\\''")
+  const diffPollSec = getDiffPollSec();
+  const escaped = opts.prompt.replace(/'/g, "'\\''");
 
   return `#!/usr/bin/env zsh
 set -uo pipefail
@@ -74,5 +70,5 @@ fi
 echo ""
 echo -e "\\033[2mAgent exited ($EXIT_CODE).\\033[0m"
 exit $EXIT_CODE
-`
+`;
 }

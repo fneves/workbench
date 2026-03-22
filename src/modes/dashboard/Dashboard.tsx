@@ -1,222 +1,220 @@
-import { createCliRenderer } from "@opentui/core"
-import { createRoot, useKeyboard } from "@opentui/react"
-import { useState, useCallback, useRef, useEffect } from "react"
-import { resolve } from "path"
+import { createCliRenderer } from "@opentui/core";
+import { createRoot, useKeyboard } from "@opentui/react";
+import { useState, useCallback, useEffect } from "react";
 
-import { notify } from "../../lib/notify"
-import { isInsideCmux, selectWorkspace, listWorkspaces, newWorkspace, splitPane, sendText, listSurfaces, waitForSurface } from "../../lib/cmux"
-import { updateState, reconcileWorktrees, type TaskState } from "../../lib/state"
-import { getScriptDir, getNotificationSound, getDashboardPollMs } from "../../lib/config"
-import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui"
+import { isInsideCmux } from "../../lib/cmux";
+import type { TaskState } from "../../lib/state";
+import { exitTui, installTuiCleanup, registerTuiRenderer } from "../../lib/tui";
 
-import { useTaskState } from "../../hooks/useTaskState"
-import { useAlert } from "../../hooks/useAlert"
-import { useEventLog } from "../../hooks/useEventLog"
+import {
+  useTaskList,
+  useRequest,
+  useWorkbenchClient,
+  WorkbenchClientContext,
+} from "../../hooks/useWorkbench";
+import { useAlert } from "../../hooks/useAlert";
+import { useEventLog } from "../../hooks/useEventLog";
 
-import { Header } from "./Header"
-import { AlertBar } from "./AlertBar"
-import { TaskTable } from "./TaskTable"
-import { EventLog } from "./EventLog"
-import { SpawnDialog } from "./SpawnDialog"
-import { Spinner } from "../../components/Spinner"
-
-/** Run a workbench subcommand as a detached child process (keeps the TUI alive). */
-function runWorkbenchCmd(args: string[]): Promise<{ ok: boolean; stderr: string }> {
-  const entryPoint = resolve(getScriptDir(), "src/index.tsx")
-  const bunPath = Bun.which("bun") ?? "bun"
-  return new Promise((resolve) => {
-    const proc = Bun.spawn([bunPath, "run", entryPoint, ...args], {
-      stdout: "ignore",
-      stderr: "pipe",
-    })
-    proc.exited.then(async (code) => {
-      const stderr = await new Response(proc.stderr).text()
-      resolve({ ok: code === 0, stderr })
-    })
-  })
-}
+import { Header } from "./Header";
+import { AlertBar } from "./AlertBar";
+import { TaskTable } from "./TaskTable";
+import { EventLog } from "./EventLog";
+import { SpawnDialog } from "./SpawnDialog";
+import { Spinner } from "../../components/Spinner";
 
 function Dashboard() {
-  const tasks = useTaskState(getDashboardPollMs())
-  const { alert, setAlert, dismissAlert } = useAlert()
-  const { entries, pushEvent } = useEventLog()
-  const [selected, setSelected] = useState(0)
-  const [showSpawn, setShowSpawn] = useState(false)
-  const [pendingOp, setPendingOp] = useState<string | null>(null)
-  const prevStatuses = useRef<Record<string, string>>({})
+  const client = useWorkbenchClient();
+  const tasks = useTaskList();
+  const request = useRequest();
+  const { alert, setAlert, dismissAlert } = useAlert();
+  const { entries, pushEvent } = useEventLog();
+  const [selected, setSelected] = useState(0);
+  const [showSpawn, setShowSpawn] = useState(false);
+  const [pendingOp, setPendingOp] = useState<string | null>(null);
 
-  // On mount, reconcile existing worktrees with state files
+  // Subscribe to task transitions for alerts + event log
   useEffect(() => {
-    reconcileWorktrees()
-  }, [])
+    if (!client?.isConnected) return;
 
-  // Detect state transitions
-  useEffect(() => {
-    for (const task of tasks) {
-      const prev = prevStatuses.current[task.branch]
-      if (prev && prev !== task.status) {
-        switch (task.status) {
-          case "done":
-            pushEvent("✓", `${task.branch} — agent finished`)
-            setAlert(`✓ ${task.branch} finished — ready for review`, "#22c55e", 6, true)
-            notify(`✓ ${task.branch}`, "Agent finished successfully", getNotificationSound("success"))
-            break
-          case "prompting":
-            pushEvent("◉", `${task.branch} — waiting for input`)
-            setAlert(`◉ ${task.branch} needs your attention`, "#eab308", 8, true)
-            notify(`⏳ ${task.branch}`, "Agent is waiting for input", getNotificationSound("waiting"))
-            break
-          case "failed":
-            pushEvent("✗", `${task.branch} — agent failed`)
-            setAlert(`✗ ${task.branch} failed`, "#ef4444", 10, true)
-            notify(`✗ ${task.branch}`, "Agent failed", getNotificationSound("failure"))
-            break
-          case "running":
-            pushEvent("●", `${task.branch} — agent started`)
-            break
-        }
+    const handler = (data: any) => {
+      const { branch, to } = data;
+      switch (to) {
+        case "done":
+          pushEvent("\u2713", `${branch} — agent finished`);
+          setAlert(`\u2713 ${branch} finished — ready for review`, "#22c55e", 6, true);
+          break;
+        case "prompting":
+          pushEvent("\u25C9", `${branch} — waiting for input`);
+          setAlert(`\u25C9 ${branch} needs your attention`, "#eab308", 8, true);
+          break;
+        case "failed":
+          pushEvent("\u2717", `${branch} — agent failed`);
+          setAlert(`\u2717 ${branch} failed`, "#ef4444", 10, true);
+          break;
+        case "running":
+          pushEvent("\u25CF", `${branch} — agent started`);
+          break;
       }
-      prevStatuses.current[task.branch] = task.status
-    }
-  }, [tasks])
+    };
+
+    client.on("task.transition", handler);
+    return () => client.off("task.transition", handler);
+  }, [client, pushEvent, setAlert]);
 
   const handleSpawn = useCallback(
     async (opts: {
-      branch: string
-      prompt: string
-      agent: "claude" | "opencode"
-      mode: "worktree" | "container"
-      baseBranch: string
-      interactive: boolean
+      branch: string;
+      prompt: string;
+      agent: "claude" | "opencode";
+      mode: "worktree" | "container";
+      baseBranch: string;
+      interactive: boolean;
     }) => {
-      setShowSpawn(false)
-      setPendingOp(`spawning ${opts.branch}`)
-      setAlert(`◌ Spawning ${opts.branch}...`, "#3b82f6", 0, false)
-      const args = ["spawn", "-b", opts.branch, "-a", opts.agent, "-m", opts.mode, "-f", opts.baseBranch]
-      if (opts.interactive || !opts.prompt) {
-        args.push("-i")
-      } else {
-        args.push("-p", opts.prompt)
+      setShowSpawn(false);
+      setPendingOp(`spawning ${opts.branch}`);
+      setAlert(`\u25CC Spawning ${opts.branch}...`, "#3b82f6", 0, false);
+      try {
+        await request("task.spawn", {
+          branch: opts.branch,
+          prompt: opts.prompt,
+          agent: opts.agent,
+          mode: opts.mode,
+          baseBranch: opts.baseBranch,
+          interactive: opts.interactive,
+        });
+        pushEvent("+", `Spawned ${opts.branch} (${opts.agent}, ${opts.mode})`);
+        setAlert(`\u2713 Spawned ${opts.branch}`, "#3b82f6", 4, false);
+      } catch (err: any) {
+        pushEvent("\u2717", `Failed: ${err.message}`);
+        setAlert(`\u2717 Failed to spawn ${opts.branch}`, "#ef4444", 6, false);
       }
-      const result = await runWorkbenchCmd(args)
-      setPendingOp(null)
-      if (result.ok) {
-        pushEvent("+", `Spawned ${opts.branch} (${opts.agent}, ${opts.mode})`)
-        setAlert(`✓ Spawned ${opts.branch}`, "#3b82f6", 4, false)
-      } else {
-        const errMsg = result.stderr.trim().split("\n").pop() ?? "unknown error"
-        pushEvent("✗", `Failed: ${errMsg}`)
-        setAlert(`✗ Failed to spawn ${opts.branch}`, "#ef4444", 6, false)
-      }
+      setPendingOp(null);
     },
-    [pushEvent, setAlert],
-  )
+    [request, pushEvent, setAlert],
+  );
 
   const handleJump = useCallback(
     async (task: TaskState) => {
-      const wsId = task.cmux_workspace_id
-      if (!wsId) return
+      const wsId = task.cmux_workspace_id;
+      if (!wsId) return;
 
       // Check if the workspace still exists in cmux
-      const workspaces = await listWorkspaces()
-      const exists = workspaces.some((w) => w.id === wsId)
+      try {
+        const result = await request("cmux.listWorkspaces");
+        const exists = result.workspaces?.some((w: any) => w.id === wsId);
 
-      if (exists) {
-        await selectWorkspace(wsId)
-        return
+        if (exists) {
+          await request("cmux.selectWorkspace", { workspaceId: wsId });
+          return;
+        }
+      } catch {
+        return;
       }
 
       // Workspace was closed — reopen it
-      setPendingOp(`reopening ${task.branch}`)
-      setAlert(`◌ Reopening ${task.branch}...`, "#3b82f6", 0, false)
+      setPendingOp(`reopening ${task.branch}`);
+      setAlert(`\u25CC Reopening ${task.branch}...`, "#3b82f6", 0, false);
 
-      const newWsId = await newWorkspace(task.branch)
-      if (!newWsId) {
-        setAlert(`✗ Failed to reopen workspace for ${task.branch}`, "#ef4444", 4, false)
-        setPendingOp(null)
-        return
+      try {
+        const wsResult = await request("cmux.newWorkspace", { title: task.branch });
+        const newWsId = wsResult.workspaceId;
+        if (!newWsId) {
+          setAlert(`\u2717 Failed to reopen workspace for ${task.branch}`, "#ef4444", 4, false);
+          setPendingOp(null);
+          return;
+        }
+
+        await request("cmux.selectWorkspace", { workspaceId: newWsId });
+        await request("task.update", { branch: task.branch, cmux_workspace_id: newWsId });
+
+        const surfaceResult = await request("cmux.listSurfaces", { workspaceId: newWsId });
+        const defaultSurface = surfaceResult.surfaces?.find((s: any) => s.type === "terminal");
+        if (defaultSurface) {
+          await request("cmux.waitForSurface", { surfaceId: defaultSurface.id });
+          await request("task.update", {
+            branch: task.branch,
+            cmux_agent_surface_id: defaultSurface.id,
+          });
+          await request("cmux.sendText", {
+            text: `cd '${task.worktree}'\n`,
+            surfaceId: defaultSurface.id,
+          });
+        }
+
+        // Create a right split for the watcher TUI
+        const splitResult = await request("cmux.splitPane", {
+          direction: "right",
+          workspaceId: newWsId,
+        });
+        if (splitResult.surfaceId) {
+          await request("cmux.waitForSurface", { surfaceId: splitResult.surfaceId });
+          await request("cmux.sendText", {
+            text: `workbench watcher '${task.worktree}' '${task.branch}'\n`,
+            surfaceId: splitResult.surfaceId,
+          });
+        }
+
+        pushEvent("\u21A9", `Reopened workspace for ${task.branch}`);
+        setAlert(`\u2713 Reopened ${task.branch}`, "#3b82f6", 3, false);
+      } catch {
+        setAlert(`\u2717 Failed to reopen ${task.branch}`, "#ef4444", 4, false);
       }
-
-      await selectWorkspace(newWsId)
-      await updateState(task.branch, { cmux_workspace_id: newWsId })
-
-      // Wait for the default terminal and launch the watcher
-      const surfaces = await listSurfaces(newWsId)
-      const defaultSurface = surfaces.find((s) => s.type === "terminal")
-      if (defaultSurface) {
-        await waitForSurface(defaultSurface.id)
-        await updateState(task.branch, { cmux_agent_surface_id: defaultSurface.id })
-        // cd into the worktree so the user lands in the right directory
-        await sendText(`cd '${task.worktree}'\n`, defaultSurface.id)
-      }
-
-      // Create a right split for the watcher TUI
-      const watcherSurfaceId = await splitPane("right", newWsId)
-      if (watcherSurfaceId) {
-        await waitForSurface(watcherSurfaceId)
-        await sendText(`workbench watcher '${task.worktree}' '${task.branch}'\n`, watcherSurfaceId)
-      }
-
-      setPendingOp(null)
-      pushEvent("↩", `Reopened workspace for ${task.branch}`)
-      setAlert(`✓ Reopened ${task.branch}`, "#3b82f6", 3, false)
+      setPendingOp(null);
     },
-    [pushEvent, setAlert],
-  )
+    [request, pushEvent, setAlert],
+  );
 
   const handleKill = useCallback(
     async (branch: string) => {
-      setPendingOp(`killing ${branch}`)
-      setAlert(`◌ Killing ${branch}...`, "#eab308", 0, false)
-      await updateState(branch, { status: "killing" })
-      const result = await runWorkbenchCmd(["kill", branch])
-      setPendingOp(null)
-      if (result.ok) {
-        pushEvent("×", `Killed ${branch}`)
-        setAlert(`× Killed ${branch}`, "#ef4444", 3, false)
-      } else {
-        const errMsg = result.stderr.trim().split("\n").pop() ?? "unknown error"
-        pushEvent("✗", `Kill failed: ${errMsg}`)
-        setAlert(`✗ Failed to kill ${branch}`, "#ef4444", 4, false)
+      setPendingOp(`killing ${branch}`);
+      setAlert(`\u25CC Killing ${branch}...`, "#eab308", 0, false);
+      try {
+        await request("task.kill", { branch });
+        pushEvent("\u00D7", `Killed ${branch}`);
+        setAlert(`\u00D7 Killed ${branch}`, "#ef4444", 3, false);
+      } catch (err: any) {
+        pushEvent("\u2717", `Kill failed: ${err.message}`);
+        setAlert(`\u2717 Failed to kill ${branch}`, "#ef4444", 4, false);
       }
-      setSelected(0)
+      setPendingOp(null);
+      setSelected(0);
     },
-    [pushEvent, setAlert],
-  )
+    [request, pushEvent, setAlert],
+  );
 
   useKeyboard((key) => {
     if (showSpawn) {
-      if (key.name === "escape") setShowSpawn(false)
-      return
+      if (key.name === "escape") setShowSpawn(false);
+      return;
     }
 
     switch (key.name) {
       case "q":
-        exitTui(0)
+        exitTui(0);
       case "n":
-        if (!pendingOp) setShowSpawn(true)
-        break
+        if (!pendingOp) setShowSpawn(true);
+        break;
       case "k":
         if (!pendingOp && tasks.length > 0 && tasks[selected]) {
-          handleKill(tasks[selected]!.branch)
+          handleKill(tasks[selected]!.branch);
         }
-        break
+        break;
       case "x":
-        dismissAlert()
-        break
+        dismissAlert();
+        break;
       case "up":
-        setSelected((s) => Math.max(0, s - 1))
-        break
+        setSelected((s) => Math.max(0, s - 1));
+        break;
       case "down":
-        setSelected((s) => Math.min(tasks.length - 1, s + 1))
-        break
+        setSelected((s) => Math.min(tasks.length - 1, s + 1));
+        break;
       case "return":
         if (isInsideCmux() && tasks[selected]) {
-          handleJump(tasks[selected]!)
+          handleJump(tasks[selected]!);
         }
-        break
+        break;
     }
-  })
+  });
 
   if (showSpawn) {
     return (
@@ -224,7 +222,7 @@ function Dashboard() {
         <Header />
         <SpawnDialog onSpawn={handleSpawn} onCancel={() => setShowSpawn(false)} />
       </box>
-    )
+    );
   }
 
   return (
@@ -235,7 +233,7 @@ function Dashboard() {
         <TaskTable tasks={tasks} selected={selected} />
       </box>
       <box style={{ paddingTop: 1 }}>
-        <text fg="#444">{"  " + "─".repeat(90)}</text>
+        <text fg="#444">{"  " + "\u2500".repeat(90)}</text>
       </box>
       {pendingOp ? (
         <box style={{ flexDirection: "row", gap: 1 }}>
@@ -246,22 +244,41 @@ function Dashboard() {
       ) : (
         <text>
           {"  "}
-          <span fg="#06b6d4">n</span>{" new   "}
-          <span fg="#06b6d4">↑↓</span>{" select   "}
-          <span fg="#06b6d4">enter</span>{" jump   "}
-          <span fg="#06b6d4">k</span>{" kill   "}
-          <span fg="#06b6d4">x</span>{" dismiss   "}
-          <span fg="#06b6d4">q</span>{" quit"}
+          <span fg="#06b6d4">n</span>
+          {" new   "}
+          <span fg="#06b6d4">{"\u2191\u2193"}</span>
+          {" select   "}
+          <span fg="#06b6d4">enter</span>
+          {" jump   "}
+          <span fg="#06b6d4">k</span>
+          {" kill   "}
+          <span fg="#06b6d4">x</span>
+          {" dismiss   "}
+          <span fg="#06b6d4">q</span>
+          {" quit"}
         </text>
       )}
       <EventLog entries={entries} />
     </box>
-  )
+  );
 }
 
 export async function runDashboard(): Promise<void> {
-  const renderer = await createCliRenderer({ useMouse: false })
-  registerTuiRenderer(renderer)
-  installTuiCleanup()
-  createRoot(renderer).render(<Dashboard />)
+  const { WorkbenchClient } = await import("../../client");
+
+  const client = new WorkbenchClient();
+  const connected = await client.connect();
+  if (!connected) {
+    console.error("Failed to connect to workbench server");
+    process.exit(1);
+  }
+
+  const renderer = await createCliRenderer({ useMouse: false });
+  registerTuiRenderer(renderer);
+  installTuiCleanup();
+  createRoot(renderer).render(
+    <WorkbenchClientContext.Provider value={client}>
+      <Dashboard />
+    </WorkbenchClientContext.Provider>,
+  );
 }

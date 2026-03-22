@@ -1,22 +1,22 @@
-import type { TaskState } from "../../lib/state"
-import { Spinner } from "../../components/Spinner"
+import type { TaskState } from "../../lib/state";
+import { Spinner } from "../../components/Spinner";
 
 function StatusIcon({ status }: { status: TaskState["status"] }) {
   switch (status) {
     case "running":
-      return <Spinner color="#22c55e" />
+      return <Spinner color="#22c55e" />;
     case "prompting":
-      return <text fg="#eab308">◉</text>
+      return <text fg="#eab308">◉</text>;
     case "done":
-      return <text fg="#06b6d4">✓</text>
+      return <text fg="#06b6d4">✓</text>;
     case "failed":
-      return <text fg="#ef4444">✗</text>
+      return <text fg="#ef4444">✗</text>;
     case "starting":
-      return <text fg="#3b82f6">◔</text>
+      return <text fg="#3b82f6">◔</text>;
     case "killing":
-      return <Spinner color="#ef4444" />
+      return <Spinner color="#ef4444" />;
     default:
-      return <text fg="#666">?</text>
+      return <text fg="#666">?</text>;
   }
 }
 
@@ -28,32 +28,20 @@ const STATUS_COLORS: Record<string, string> = {
   starting: "#3b82f6",
   killing: "#ef4444",
   unknown: "#666",
-}
+};
 
-function TaskRow({
-  task,
-  index,
-  selected,
-}: {
-  task: TaskState
-  index: number
-  selected: boolean
-}) {
-  const statusColor = STATUS_COLORS[task.status] ?? "#666"
-  const branch = task.branch.slice(0, 28)
-  const modeBadge = task.mode === "container" ? " [ctr]" : ""
+function TaskRow({ task, index, selected }: { task: TaskState; index: number; selected: boolean }) {
+  const statusColor = STATUS_COLORS[task.status] ?? "#666";
+  const branch = task.branch.slice(0, 28);
+  const modeBadge = task.mode === "container" ? " [ctr]" : "";
 
   return (
     <box style={{ flexDirection: "row", gap: 1 }}>
-      <text fg={selected ? "white" : undefined}>
-        {selected ? "▸" : " "}
-      </text>
+      <text fg={selected ? "white" : undefined}>{selected ? "▸" : " "}</text>
       <text fg="#666" style={{ width: 3 }}>
         {String(index + 1).padStart(2)}
       </text>
-      <text style={{ width: 30 }}>
-        {branch + modeBadge}
-      </text>
+      <text style={{ width: 30 }}>{branch + modeBadge}</text>
       <box style={{ flexDirection: "row", gap: 0, width: 14 }}>
         <StatusIcon status={task.status} />
         <text fg={statusColor}> {task.status}</text>
@@ -71,16 +59,10 @@ function TaskRow({
         {task.agent}
       </text>
     </box>
-  )
+  );
 }
 
-export function TaskTable({
-  tasks,
-  selected,
-}: {
-  tasks: TaskState[]
-  selected: number
-}) {
+export function TaskTable({ tasks, selected }: { tasks: TaskState[]; selected: number }) {
   return (
     <box style={{ flexDirection: "column" }}>
       <text fg="#666">
@@ -99,18 +81,17 @@ export function TaskTable({
       <text fg="#444">{"  " + "─".repeat(90)}</text>
       {tasks.length === 0 ? (
         <box style={{ paddingTop: 1 }}>
-          <text fg="#666">{"  No active tasks. Press "}<span fg="#06b6d4">n</span>{" to spawn one."}</text>
+          <text fg="#666">
+            {"  No active tasks. Press "}
+            <span fg="#06b6d4">n</span>
+            {" to spawn one."}
+          </text>
         </box>
       ) : (
         tasks.map((task, i) => (
-          <TaskRow
-            key={task.branch}
-            task={task}
-            index={i}
-            selected={i === selected}
-          />
+          <TaskRow key={task.branch} task={task} index={i} selected={i === selected} />
         ))
       )}
     </box>
-  )
+  );
 }

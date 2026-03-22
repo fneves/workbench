@@ -1,17 +1,19 @@
-import type { Alert } from "../../hooks/useAlert"
-import { useTerminalDimensions } from "@opentui/react"
+import type { Alert } from "../../hooks/useAlert";
+import { useTerminalDimensions } from "@opentui/react";
 
 export function AlertBar({ alert }: { alert: Alert | null }) {
-  const { width } = useTerminalDimensions()
+  const { width } = useTerminalDimensions();
 
   if (!alert) {
-    return <text>{""}</text>
+    return <text>{""}</text>;
   }
 
-  const msg = `  ${alert.message}`
-  const padding = Math.max(0, width - msg.length)
+  const msg = `  ${alert.message}`;
+  const padding = Math.max(0, width - msg.length);
 
   return (
-    <text bg={alert.color} fg="black">{msg + " ".repeat(padding)}</text>
-  )
+    <text bg={alert.color} fg="black">
+      {msg + " ".repeat(padding)}
+    </text>
+  );
 }

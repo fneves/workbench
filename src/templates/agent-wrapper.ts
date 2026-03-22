@@ -3,34 +3,34 @@ import {
   getNotificationSoundsEnabled,
   getNotificationSound,
   getDiffPollSec,
-} from "../lib/config"
+} from "../lib/config";
 import {
   shellUpdateState,
   shellUpdateDiffStats,
   shellNotify,
   shellDiffPoller,
-} from "./shell-helpers"
+} from "./shell-helpers";
 
 export function generateAgentWrapper(opts: {
-  stateFile: string
-  worktreeDir: string
-  branch: string
-  agent: "claude" | "opencode"
-  prompt: string
-  interactive: boolean
+  stateFile: string;
+  worktreeDir: string;
+  branch: string;
+  agent: "claude" | "opencode";
+  prompt: string;
+  interactive: boolean;
 }): string {
-  const notifyEnabled = getNotificationsEnabled()
-  const soundsEnabled = getNotificationSoundsEnabled()
-  const soundSuccess = soundsEnabled ? getNotificationSound("success") : ""
-  const soundFailure = soundsEnabled ? getNotificationSound("failure") : ""
-  const diffPollSec = getDiffPollSec()
+  const notifyEnabled = getNotificationsEnabled();
+  const soundsEnabled = getNotificationSoundsEnabled();
+  const soundSuccess = soundsEnabled ? getNotificationSound("success") : "";
+  const soundFailure = soundsEnabled ? getNotificationSound("failure") : "";
+  const diffPollSec = getDiffPollSec();
 
   const agentCmd = (() => {
-    if (opts.agent === "opencode") return "opencode"
-    if (opts.interactive || !opts.prompt) return "claude"
-    const escaped = opts.prompt.replace(/'/g, "'\\''")
-    return `claude '${escaped}'`
-  })()
+    if (opts.agent === "opencode") return "opencode";
+    if (opts.interactive || !opts.prompt) return "claude";
+    const escaped = opts.prompt.replace(/'/g, "'\\''");
+    return `claude '${escaped}'`;
+  })();
 
   return `#!/usr/bin/env zsh
 set -uo pipefail
@@ -75,5 +75,5 @@ fi
 echo ""
 echo -e "\\033[2mAgent exited ($EXIT_CODE). You're still in the worktree. Ctrl+D to close.\\033[0m"
 exec zsh
-`
+`;
 }

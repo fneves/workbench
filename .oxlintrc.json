@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn"],
+  "env": {
+    "browser": false,
+    "node": true
+  },
+  "settings": {
+    "react": {
+      "version": "19"
+    }
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-console": "off",
+    "eqeqeq": "error",
+    "no-var": "error",
+    "prefer-const": "warn",
+    "no-debugger": "error",
+    "no-useless-escape": "off",
+    "no-empty": "off",
+
+    "typescript/no-explicit-any": "off",
+    "typescript/no-non-null-assertion": "off",
+
+    "react/exhaustive-deps": "warn",
+    "react/jsx-no-duplicate-props": "error",
+    "react/jsx-key": "error",
+    "react/no-direct-mutation-state": "error",
+    "react/no-children-prop": "error",
+
+    "import/no-duplicates": "error",
+
+    "unicorn/prefer-node-protocol": "off",
+    "unicorn/no-null": "off"
+  },
+  "ignorePatterns": ["node_modules/", "dist/", "*.d.ts"]
+}

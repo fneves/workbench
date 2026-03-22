@@ -1,4 +1,4 @@
-import { getDefaultEditor } from "../lib/config"
+import { getDefaultEditor } from "../lib/config";
 
 /**
  * Generate a shell script that handles the full PR creation flow:
@@ -9,11 +9,11 @@ import { getDefaultEditor } from "../lib/config"
  * 5. Create PR via gh cli after editor exits
  */
 export function generatePrCreatorScript(opts: {
-  worktree: string
-  branch: string
-  slug: string
+  worktree: string;
+  branch: string;
+  slug: string;
 }): string {
-  const editor = getDefaultEditor()
+  const editor = getDefaultEditor();
 
   return `#!/usr/bin/env zsh
 set -uo pipefail
@@ -203,5 +203,5 @@ fi
 
 # Cleanup temp files
 rm -rf "$PR_DIR"
-`
+`;
 }

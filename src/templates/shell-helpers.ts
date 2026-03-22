@@ -12,7 +12,7 @@ export function shellUpdateState(): string {
     jq --arg k "$key" --arg v "$value" \\
         '.[$k] = $v | .updated_at = (now | todate)' \\
         "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
-}`
+}`;
 }
 
 /** Shell function that refreshes diff_files / diff_added / diff_removed in state. */
@@ -31,7 +31,7 @@ export function shellUpdateDiffStats(): string {
     jq --argjson f "\${files:-0}" --argjson a "\${added:-0}" --argjson r "\${removed:-0}" \\
         '.diff_files = $f | .diff_added = $a | .diff_removed = $r | .updated_at = (now | todate)' \\
         "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
-}`
+}`;
 }
 
 /**
@@ -58,7 +58,7 @@ export function shellNotify(): string {
         notify-send --urgency=normal --app-name="workbench" "$title" "$body" 2>/dev/null &
     fi
     printf "\\a"
-}`
+}`;
 }
 
 /**
@@ -75,5 +75,5 @@ export function shellDiffPoller(intervalSec: number): string {
     done
 ) &
 DIFF_PID=$!
-trap 'kill $DIFF_PID 2>/dev/null' EXIT`
+trap 'kill $DIFF_PID 2>/dev/null' EXIT`;
 }

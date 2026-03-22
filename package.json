@@ -4,7 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src/",
+    "lint:fix": "oxlint --fix src/",
+    "fmt": "oxfmt src/",
+    "fmt:check": "oxfmt --check src/",
+    "check": "bun run typecheck && bun run lint && bun run fmt:check"
   },
   "dependencies": {
     "@opentui/core": "^0.1.88",
@@ -12,8 +17,10 @@
     "react": "^19.1.0"
   },
   "devDependencies": {
-    "@types/react": "^19.1.0",
     "@types/bun": "^1.2.0",
+    "@types/react": "^19.1.0",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
     "typescript": "^5.8.0"
   }
 }
