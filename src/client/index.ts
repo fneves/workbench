@@ -9,40 +9,46 @@ export class WorkbenchClient {
   private listeners = new Map<string, Set<EventHandler>>();
   private buffer = "";
   private requestId = 0;
-  private connected = false;
 
   get isConnected(): boolean {
-    return this.connected;
+    return this.socket !== null && !this.socket.destroyed && this.socket.writable;
   }
 
   connect(socketPath = SERVER_SOCKET_PATH): Promise<boolean> {
     return new Promise((resolve) => {
       this.socket = new Socket();
+      let resolved = false;
+
+      const done = (success: boolean) => {
+        if (resolved) return;
+        resolved = true;
+        if (success) {
+          this.socket!.setTimeout(0);
+        }
+        resolve(success);
+      };
+
       this.socket.setTimeout(5000);
 
-      this.socket.on("connect", () => {
-        this.connected = true;
-        this.socket!.setTimeout(0); // Clear connect timeout
-        resolve(true);
-      });
+      this.socket.on("connect", () => done(true));
 
       this.socket.on("error", () => {
-        if (!this.connected) resolve(false);
-        this.connected = false;
+        // Only fail the initial connection. After connected, errors are
+        // handled per-write — the socket may still be usable.
+        if (!resolved) done(false);
       });
 
       this.socket.on("timeout", () => {
-        if (!this.connected) {
+        if (!resolved) {
           this.socket!.destroy();
-          resolve(false);
+          done(false);
         }
       });
 
       this.socket.on("data", (chunk: Buffer) => this.handleData(chunk));
 
       this.socket.on("close", () => {
-        this.connected = false;
-        // Reject all pending requests
+        // Socket is truly gone — reject all pending requests
         for (const [id, { resolve }] of this.pending) {
           resolve({ id, ok: false, error: { code: "DISCONNECTED", message: "Connection closed" } });
         }
@@ -63,10 +69,8 @@ export class WorkbenchClient {
       try {
         const msg = JSON.parse(line);
         if ("event" in msg && !("id" in msg)) {
-          // Push event
           this.emit(msg.event, msg.data);
         } else if ("id" in msg) {
-          // Response
           const pending = this.pending.get(msg.id);
           if (pending) {
             this.pending.delete(msg.id);
@@ -78,7 +82,7 @@ export class WorkbenchClient {
   }
 
   async request(method: string, params?: Record<string, unknown>): Promise<Response> {
-    if (!this.connected || !this.socket) {
+    if (!this.isConnected) {
       return {
         id: "",
         ok: false,
@@ -91,7 +95,18 @@ export class WorkbenchClient {
 
     return new Promise((resolve) => {
       this.pending.set(id, { resolve });
-      this.socket!.write(payload);
+
+      try {
+        this.socket!.write(payload);
+      } catch {
+        this.pending.delete(id);
+        resolve({
+          id,
+          ok: false,
+          error: { code: "WRITE_FAILED", message: "Failed to send request" },
+        });
+        return;
+      }
 
       // 30s timeout for long operations (spawn can take a while)
       setTimeout(() => {
@@ -121,7 +136,6 @@ export class WorkbenchClient {
   }
 
   close(): void {
-    this.connected = false;
     if (this.socket) {
       this.socket.destroy();
       this.socket = null;

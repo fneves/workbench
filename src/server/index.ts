@@ -104,17 +104,29 @@ export class WorkbenchServer {
   }
 
   private send(socket: Socket, msg: Record<string, any>): void {
+    if (socket.destroyed) {
+      this.clients.delete(socket);
+      return;
+    }
     try {
       socket.write(JSON.stringify(msg) + "\n");
-    } catch {}
+    } catch {
+      this.clients.delete(socket);
+    }
   }
 
   private broadcast(event: Event): void {
     const line = JSON.stringify(event) + "\n";
     for (const client of this.clients) {
+      if (client.destroyed) {
+        this.clients.delete(client);
+        continue;
+      }
       try {
         client.write(line);
-      } catch {}
+      } catch {
+        this.clients.delete(client);
+      }
     }
   }
 

@@ -48,11 +48,21 @@ export async function cmdStart(): Promise<void> {
   await server.start();
   console.log(`${C.green}Server started${C.nc}`);
 
-  // Launch the dashboard directly in this process (blocks until dashboard exits)
+  // Clean up server when the process exits (TUI exit, SIGINT, etc.)
+  const cleanup = () => server.stop();
+  process.on("exit", cleanup);
+  process.on("SIGINT", () => {
+    cleanup();
+    process.exit(130);
+  });
+  process.on("SIGTERM", () => {
+    cleanup();
+    process.exit(143);
+  });
+
+  // Launch the dashboard — render is non-blocking, process stays alive
+  // because OpenTUI holds stdin open in raw mode
   console.log(`${C.green}Launching dashboard...${C.nc}`);
   const { runDashboard } = await import("../modes/dashboard/Dashboard");
   await runDashboard();
-
-  // Dashboard exited — shut down server
-  server.stop();
 }
