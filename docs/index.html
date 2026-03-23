@@ -67,6 +67,19 @@
       transition: all 0.15s;
     }
     .install-box .copy-btn:hover { color: var(--fg); background: #2a3040; }
+    .install-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--green);
+      margin-bottom: 0.5rem;
+    }
+    .install-note {
+      color: var(--dim);
+      font-size: 0.85rem;
+      margin-bottom: 2.5rem;
+    }
     .section { margin-bottom: 2rem; }
     .section h2 {
       font-size: 1.1rem;
@@ -122,10 +135,12 @@
     <h1><span>⚡</span> workbench</h1>
     <p class="tagline">Run multiple AI coding agents in parallel, each in its own git worktree, orchestrated from a terminal dashboard.</p>
 
+    <p class="install-label">Recommended install</p>
     <div class="install-box">
       <code>curl -fsSL https://fneves.github.io/workbench/install.sh | sh</code>
       <button class="copy-btn" onclick="navigator.clipboard.writeText('curl -fsSL https://fneves.github.io/workbench/install.sh | sh');this.textContent='copied!';setTimeout(()=>this.textContent='copy',1500)">copy</button>
     </div>
+    <p class="install-note">Downloads the latest release, installs dependencies, and sets up your PATH. Works on macOS (arm64) and Linux (x64).</p>
 
     <div class="section">
       <h2>What it does</h2>
