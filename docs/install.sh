@@ -61,6 +61,26 @@ fi
 
 ok "Latest version: ${LATEST}"
 
+# --- Check if already installed and up-to-date ---
+
+CURRENT=""
+if [[ -x "$INSTALL_DIR/workbench" ]]; then
+    CURRENT=$("$INSTALL_DIR/workbench" --version 2>/dev/null || echo "")
+fi
+
+if [[ -n "$CURRENT" && "$CURRENT" == "$LATEST" ]]; then
+    ok "Already up-to-date (${CURRENT})"
+    echo
+    echo -e "${C_GREEN}${C_BOLD}Nothing to do.${C_NC}"
+    exit 0
+fi
+
+if [[ -n "$CURRENT" ]]; then
+    info "Updating ${CURRENT} → ${LATEST}"
+else
+    info "Fresh install"
+fi
+
 # --- Download binary ---
 
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${ARTIFACT}.tar.gz"
@@ -209,11 +229,14 @@ echo
 
 # --- Done ---
 
+ACTION="Installation"
+[[ -n "$CURRENT" ]] && ACTION="Update"
+
 if [[ $ISSUES -gt 0 ]]; then
-    echo -e "${C_YELLOW}${C_BOLD}Installed with ${ISSUES} missing requirement(s).${C_NC}"
+    echo -e "${C_YELLOW}${C_BOLD}${ACTION} completed with ${ISSUES} missing requirement(s).${C_NC}"
     echo -e "Fix the items above, then run: ${C_CYAN}workbench doctor${C_NC}"
 else
-    echo -e "${C_GREEN}${C_BOLD}Installation complete.${C_NC}"
+    echo -e "${C_GREEN}${C_BOLD}${ACTION} complete.${C_NC}"
 fi
 
 echo
