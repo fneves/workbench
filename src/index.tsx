@@ -1,6 +1,10 @@
 #!/usr/bin/env bun
 export {};
 
+// Injected at build time via --define. Falls back to "dev" for local runs.
+declare var __WORKBENCH_VERSION__: string;
+const VERSION = typeof __WORKBENCH_VERSION__ !== "undefined" ? __WORKBENCH_VERSION__ : "dev";
+
 const C = {
   purple: "\x1b[0;35m",
   cyan: "\x1b[0;36m",
@@ -77,6 +81,10 @@ switch (command) {
     await runWatcher(args[0] ?? ".", args[1] ?? "");
     break;
   }
+  case "-v":
+  case "--version":
+    console.log(VERSION);
+    break;
   case "-h":
   case "--help":
   case "help":

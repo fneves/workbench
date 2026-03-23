@@ -34,7 +34,7 @@ jobs:
         run: bun run check
 
       - name: Build
-        run: bun build --compile src/index.tsx --outfile dist/${{ matrix.artifact }}
+        run: bun build --compile src/index.tsx --outfile dist/${{ matrix.artifact }} --define __WORKBENCH_VERSION__="'${{ github.ref_name }}'"
 
       - name: Compress
         run: |
