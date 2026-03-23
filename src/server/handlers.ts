@@ -218,17 +218,16 @@ export const handlers: Record<string, Handler> = {
     const reviewFilePath = `/tmp/workbench/${slug}-review.md`;
     const reviewSentinelPath = `${reviewFilePath}.ready`;
 
-    const fileScope = filePath
-      ? `Run git diff main -- '${filePath}' to examine the changes in ${filePath}.`
-      : `Run git diff main to examine the current changes.`;
-    const prompt = `You are an adversarial code reviewer. ${fileScope} Write a thorough review covering: bugs and logic errors, security vulnerabilities, missing edge cases and error handling, performance concerns, and code quality issues. Format as markdown with specific file and line references. Be critical and actionable.`;
+    const fileFilter = filePath ? ` -- '${filePath}'` : "";
+    const fileNote = filePath ? ` in ${filePath}` : "";
+    const prompt = `You are an adversarial code reviewer. Run git log $BASE_BRANCH..HEAD --oneline to see the branch commits, then run git diff $BASE_BRANCH..HEAD${fileFilter} to examine the committed changes${fileNote} on this branch. Write a thorough review covering: bugs and logic errors, security vulnerabilities, missing edge cases and error handling, performance concerns, and code quality issues. Format as markdown with specific file and line references. Be critical and actionable.`;
     const escaped = prompt.replace(/'/g, "'\\''");
 
     Bun.spawn(
       [
         "sh",
         "-c",
-        `cd '${worktree}' && claude '${escaped}' > '${reviewFilePath}' && touch '${reviewSentinelPath}'`,
+        `cd '${worktree}' && BASE_BRANCH="$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo 'main')" && claude '${escaped}' > '${reviewFilePath}' && touch '${reviewSentinelPath}'`,
       ],
       {
         stdout: "ignore",
