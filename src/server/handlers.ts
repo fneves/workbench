@@ -139,7 +139,11 @@ export const handlers: Record<string, Handler> = {
       worktree = state?.worktree;
     }
     if (!worktree) throw { code: "NO_WORKTREE", message: "No worktree found" };
-    const proc = Bun.spawn(["git", "add", "-A"], { cwd: worktree, stdout: "ignore", stderr: "ignore" });
+    const proc = Bun.spawn(["git", "add", "-A"], {
+      cwd: worktree,
+      stdout: "ignore",
+      stderr: "ignore",
+    });
     await proc.exited;
     return {};
   },
