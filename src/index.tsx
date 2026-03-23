@@ -2,7 +2,7 @@
 export {};
 
 // Injected at build time via --define. Falls back to "dev" for local runs.
-declare var __WORKBENCH_VERSION__: string;
+declare const __WORKBENCH_VERSION__: string;
 const VERSION = typeof __WORKBENCH_VERSION__ !== "undefined" ? __WORKBENCH_VERSION__ : "dev";
 
 const C = {
