@@ -16,13 +16,13 @@ jobs:
           - os: macos-latest
             target: bun-darwin-arm64
             artifact: workbench-darwin-arm64
-          - os: macos-13
+          - os: macos-latest
             target: bun-darwin-x64
             artifact: workbench-darwin-x64
           - os: ubuntu-latest
             target: bun-linux-x64
             artifact: workbench-linux-x64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-latest
             target: bun-linux-arm64
             artifact: workbench-linux-arm64
 
@@ -42,8 +42,7 @@ jobs:
         run: bun run check
 
       - name: Build
-        run: |
-          bun build --compile --target=${{ matrix.target }} src/index.tsx --outfile dist/${{ matrix.artifact }}
+        run: bun build --compile --target=${{ matrix.target }} src/index.tsx --outfile dist/${{ matrix.artifact }}
 
       - name: Compress
         run: |
