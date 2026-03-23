@@ -17,6 +17,22 @@ function runRaw(args: string[], cwd?: string): { ok: boolean; stdout: string } {
   };
 }
 
+/** Async version of run() — does not block the event loop. */
+async function runAsync(args: string[], cwd?: string): Promise<{ ok: boolean; stdout: string }> {
+  const proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "ignore" });
+  const code = await proc.exited;
+  const stdout = await new Response(proc.stdout).text();
+  return { ok: code === 0, stdout: stdout.trim() };
+}
+
+/** Async version of runRaw() — preserves leading whitespace. */
+async function runRawAsync(args: string[], cwd?: string): Promise<{ ok: boolean; stdout: string }> {
+  const proc = Bun.spawn(args, { cwd, stdout: "pipe", stderr: "ignore" });
+  const code = await proc.exited;
+  const stdout = await new Response(proc.stdout).text();
+  return { ok: code === 0, stdout: stdout.trimEnd() };
+}
+
 export function createWorktree(worktreeDir: string, branch: string, baseBranch: string): boolean {
   const repo = getRepoRoot();
   // Try creating new branch from base
@@ -141,6 +157,95 @@ export function getFileChanges(worktreeDir: string): FileChange[] {
     let originalPath: string | undefined;
 
     // Renames/copies: porcelain v1 uses tab to separate new\told paths
+    if ((x === "R" || x === "C") && rest.includes("\t")) {
+      const tabIdx = rest.indexOf("\t");
+      path = rest.slice(0, tabIdx);
+      originalPath = rest.slice(tabIdx + 1);
+    }
+
+    let status: FileStatus;
+    if (x === "?" && y === "?") {
+      status = "untracked";
+    } else if (x === "U" || y === "U") {
+      status = "conflict";
+    } else if (x === "R" || x === "C") {
+      status = "renamed";
+    } else if (x === "A" && y === " ") {
+      status = "added";
+    } else if (x === "D" || y === "D") {
+      status = "deleted";
+    } else if (x !== " " && y !== " ") {
+      status = "both";
+    } else if (x !== " ") {
+      status = "staged";
+    } else {
+      status = "unstaged";
+    }
+
+    const lineCount = lineMap.get(path) ?? { added: 0, removed: 0 };
+    changes.push({ path, originalPath, status, ...lineCount });
+  }
+
+  return changes;
+}
+
+// --- Async variants for use in server polling (non-blocking) ---
+
+export async function getDiffStatsAsync(worktreeDir: string): Promise<DiffStats> {
+  const result = await runAsync(["git", "diff", "--shortstat", "HEAD"], worktreeDir);
+  if (!result.ok || !result.stdout) return { files: 0, added: 0, removed: 0 };
+
+  const summary = result.stdout;
+  const files = parseInt(summary.match(/(\d+) file/)?.[1] ?? "0", 10);
+  const added = parseInt(summary.match(/(\d+) insertion/)?.[1] ?? "0", 10);
+  const removed = parseInt(summary.match(/(\d+) deletion/)?.[1] ?? "0", 10);
+  return { files, added, removed };
+}
+
+export async function getCurrentBranchAsync(worktreeDir: string): Promise<string | null> {
+  const result = await runAsync(["git", "rev-parse", "--abbrev-ref", "HEAD"], worktreeDir);
+  const branch = result.stdout;
+  if (!result.ok || !branch || branch === "HEAD") return null;
+  return branch;
+}
+
+export async function getFileChangesAsync(worktreeDir: string): Promise<FileChange[]> {
+  const statusResult = await runRawAsync(["git", "status", "--porcelain", "-uall"], worktreeDir);
+  if (!statusResult.ok || !statusResult.stdout) return [];
+
+  // Run both numstat commands concurrently
+  const [unstaged, staged] = await Promise.all([
+    runAsync(["git", "diff", "--numstat"], worktreeDir),
+    runAsync(["git", "diff", "--numstat", "--cached"], worktreeDir),
+  ]);
+
+  const lineMap = new Map<string, { added: number; removed: number }>();
+  for (const result of [unstaged, staged]) {
+    if (!result.ok || !result.stdout) continue;
+    for (const line of result.stdout.split("\n")) {
+      const parts = line.split("\t");
+      if (parts.length < 3) continue;
+      const added = parseInt(parts[0]!, 10);
+      const removed = parseInt(parts[1]!, 10);
+      const path = parts[2]!;
+      if (!isNaN(added) && !isNaN(removed) && path) {
+        const prev = lineMap.get(path) ?? { added: 0, removed: 0 };
+        lineMap.set(path, { added: prev.added + added, removed: prev.removed + removed });
+      }
+    }
+  }
+
+  const changes: FileChange[] = [];
+
+  for (const line of statusResult.stdout.split("\n")) {
+    if (line.length < 3) continue;
+    const x = line[0]!;
+    const y = line[1]!;
+    const rest = line.slice(3);
+
+    let path = rest;
+    let originalPath: string | undefined;
+
     if ((x === "R" || x === "C") && rest.includes("\t")) {
       const tabIdx = rest.indexOf("\t");
       path = rest.slice(0, tabIdx);

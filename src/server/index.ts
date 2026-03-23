@@ -2,7 +2,7 @@ import { createServer, type Server, type Socket } from "net";
 import { existsSync, unlinkSync, readFileSync } from "fs";
 
 import { listTasks, type TaskState } from "#lib/state";
-import { getFileChanges } from "#lib/git";
+import { getFileChangesAsync } from "#lib/git";
 import { notify } from "#lib/notify";
 import { getNotificationSound, branchToSlug } from "#lib/config";
 import { handlers } from "#server/handlers";
@@ -20,6 +20,10 @@ export class WorkbenchServer {
   private prevTaskMap = new Map<string, TaskState>();
   private prevFilesJson = new Map<string, string>();
   private broadcastedPrUrls = new Set<string>();
+
+  // Overlap guards — skip poll if previous one is still running
+  private pollTaskBusy = false;
+  private pollFilesBusy = false;
 
   constructor(socketPath = SERVER_SOCKET_PATH) {
     this.socketPath = socketPath;
@@ -146,6 +150,16 @@ export class WorkbenchServer {
   }
 
   private async pollTaskState(): Promise<void> {
+    if (this.pollTaskBusy) return;
+    this.pollTaskBusy = true;
+    try {
+      await this._pollTaskState();
+    } finally {
+      this.pollTaskBusy = false;
+    }
+  }
+
+  private async _pollTaskState(): Promise<void> {
     const tasks = await listTasks();
     const currentMap = new Map(tasks.map((t) => [t.branch, t]));
 
@@ -201,12 +215,22 @@ export class WorkbenchServer {
   }
 
   private async pollFileChanges(): Promise<void> {
+    if (this.pollFilesBusy) return;
+    this.pollFilesBusy = true;
+    try {
+      await this._pollFileChanges();
+    } finally {
+      this.pollFilesBusy = false;
+    }
+  }
+
+  private async _pollFileChanges(): Promise<void> {
     for (const [branch, task] of this.prevTaskMap) {
       if (task.status === "killing") continue;
       if (!task.worktree || !existsSync(task.worktree)) continue;
 
       try {
-        const files = getFileChanges(task.worktree);
+        const files = await getFileChangesAsync(task.worktree);
         const serialized = JSON.stringify(files);
 
         if (this.prevFilesJson.get(branch) !== serialized) {

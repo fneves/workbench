@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from "fs";
 import { basename, resolve } from "path";
 import { WORKBENCH_STATE_DIR, getStateFile, getRepoRoot } from "#lib/config";
-import { getDiffStats, getCurrentBranch } from "#lib/git";
+import { getDiffStatsAsync, getCurrentBranchAsync } from "#lib/git";
 import { isProcessAlive } from "#lib/process";
 
 export interface TaskState {
@@ -45,10 +45,10 @@ export async function updateState(branch: string, updates: Partial<TaskState>): 
 }
 
 export async function listTasks(): Promise<TaskState[]> {
-  const { readdirSync } = await import("fs");
+  const { readdir } = await import("fs/promises");
   const tasks: TaskState[] = [];
   try {
-    const files = readdirSync(WORKBENCH_STATE_DIR);
+    const files = await readdir(WORKBENCH_STATE_DIR);
     for (const f of files) {
       if (!f.endsWith(".json")) continue;
       const branch = f.replace(/\.json$/, "");
@@ -132,8 +132,8 @@ export async function reconcileWorktrees(): Promise<void> {
       if (existing) continue;
 
       // No state file — create one from what we can infer
-      const actualBranch = getCurrentBranch(worktreeDir) ?? branch;
-      const diff = getDiffStats(worktreeDir);
+      const actualBranch = (await getCurrentBranchAsync(worktreeDir)) ?? branch;
+      const diff = await getDiffStatsAsync(worktreeDir);
       const now = new Date().toISOString();
       const state: TaskState = {
         branch: actualBranch,
@@ -172,7 +172,7 @@ export async function reconcileWorktrees(): Promise<void> {
 
     // Refresh diff stats if the worktree still exists
     if (task.worktree && existsSync(task.worktree)) {
-      const diff = getDiffStats(task.worktree);
+      const diff = await getDiffStatsAsync(task.worktree);
       updates.diff_added = diff.added;
       updates.diff_removed = diff.removed;
       updates.diff_files = diff.files;

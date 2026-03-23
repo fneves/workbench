@@ -1,7 +1,7 @@
 import { resolve } from "path";
 import { writeFileSync, chmodSync, unlinkSync } from "fs";
 import { listTasks, readState, updateState } from "#lib/state";
-import { getDiffStats, getFileChanges } from "#lib/git";
+import { getDiffStatsAsync, getFileChangesAsync } from "#lib/git";
 import { getConfig, getScriptDir, branchToSlug, getDefaultEditor } from "#lib/config";
 import {
   selectWorkspace,
@@ -119,7 +119,7 @@ export const handlers: Record<string, Handler> = {
       worktree = state?.worktree;
     }
     if (!worktree) throw { code: "NO_WORKTREE", message: "No worktree found" };
-    return getDiffStats(worktree);
+    return getDiffStatsAsync(worktree);
   },
 
   "git.fileChanges": async (params) => {
@@ -129,7 +129,7 @@ export const handlers: Record<string, Handler> = {
       worktree = state?.worktree;
     }
     if (!worktree) throw { code: "NO_WORKTREE", message: "No worktree found" };
-    return { files: getFileChanges(worktree) };
+    return { files: await getFileChangesAsync(worktree) };
   },
 
   "git.stageAll": async (params) => {
@@ -139,7 +139,8 @@ export const handlers: Record<string, Handler> = {
       worktree = state?.worktree;
     }
     if (!worktree) throw { code: "NO_WORKTREE", message: "No worktree found" };
-    Bun.spawnSync(["git", "add", "-A"], { cwd: worktree });
+    const proc = Bun.spawn(["git", "add", "-A"], { cwd: worktree, stdout: "ignore", stderr: "ignore" });
+    await proc.exited;
     return {};
   },
 
@@ -295,13 +296,17 @@ export const handlers: Record<string, Handler> = {
   },
 
   "config.tools": async () => {
-    return {
-      fzf: Bun.spawnSync(["which", "fzf"]).exitCode === 0,
-      lazygit: Bun.spawnSync(["which", "lazygit"]).exitCode === 0,
-      delta: Bun.spawnSync(["which", "delta"]).exitCode === 0,
-      bat: Bun.spawnSync(["which", "bat"]).exitCode === 0,
-      claude: Bun.which("claude") !== null,
-      gh: Bun.spawnSync(["which", "gh"]).exitCode === 0,
+    const check = async (cmd: string) => {
+      const proc = Bun.spawn(["which", cmd], { stdout: "ignore", stderr: "ignore" });
+      return (await proc.exited) === 0;
     };
+    const [fzf, lazygit, delta, bat, gh] = await Promise.all([
+      check("fzf"),
+      check("lazygit"),
+      check("delta"),
+      check("bat"),
+      check("gh"),
+    ]);
+    return { fzf, lazygit, delta, bat, claude: Bun.which("claude") !== null, gh };
   },
 };
