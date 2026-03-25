@@ -37,22 +37,25 @@ export function cmdDoctor(): void {
   console.log(`${C.bold}Required${C.nc}`);
 
   const git = check("git");
-  if (git.found) ok("git", git.path!);
-  else {
+  if (git.found) {
+    ok("git", git.path!);
+  } else {
     fail("git", "install with: brew install git");
     issues++;
   }
 
   const jq = check("jq");
-  if (jq.found) ok("jq", jq.path!);
-  else {
+  if (jq.found) {
+    ok("jq", jq.path!);
+  } else {
     fail("jq", "install with: brew install jq");
     issues++;
   }
 
   const cmux = check("cmux");
-  if (cmux.found) ok("cmux", cmux.path!);
-  else {
+  if (cmux.found) {
+    ok("cmux", cmux.path!);
+  } else {
     fail("cmux", "https://github.com/nichochar/cmux");
     issues++;
   }
@@ -71,11 +74,17 @@ export function cmdDoctor(): void {
   const claude = check("claude");
   const opencode = check("opencode");
 
-  if (claude.found) ok("claude", claude.path!);
-  else warn("claude", "npm install -g @anthropic-ai/claude-code");
+  if (claude.found) {
+    ok("claude", claude.path!);
+  } else {
+    warn("claude", "npm install -g @anthropic-ai/claude-code");
+  }
 
-  if (opencode.found) ok("opencode", opencode.path!);
-  else warn("opencode", "optional alternative agent");
+  if (opencode.found) {
+    ok("opencode", opencode.path!);
+  } else {
+    warn("opencode", "optional alternative agent");
+  }
 
   if (!claude.found && !opencode.found) {
     fail("no agent found", "install at least one: claude or opencode");
@@ -97,8 +106,11 @@ export function cmdDoctor(): void {
 
   for (const [cmd, install, desc] of optional) {
     const result = check(cmd);
-    if (result.found) ok(`${cmd}`, `${result.path!}  (${desc})`);
-    else warn(`${cmd}`, `${install}  (${desc})`);
+    if (result.found) {
+      ok(`${cmd}`, `${result.path!}  (${desc})`);
+    } else {
+      warn(`${cmd}`, `${install}  (${desc})`);
+    }
   }
 
   console.log();
@@ -109,15 +121,21 @@ export function cmdDoctor(): void {
   const docker = check("docker");
   if (docker.found) {
     const running = Bun.spawnSync(["docker", "info"], { stdout: "ignore", stderr: "ignore" });
-    if (running.exitCode === 0) ok("docker", `${docker.path!}  (running)`);
-    else warn("docker", `${docker.path!}  (installed but not running)`);
+    if (running.exitCode === 0) {
+      ok("docker", `${docker.path!}  (running)`);
+    } else {
+      warn("docker", `${docker.path!}  (installed but not running)`);
+    }
   } else {
     warn("docker", "needed for container mode only");
   }
 
   const dc = check("devcontainer");
-  if (dc.found) ok("devcontainer", dc.path!);
-  else warn("devcontainer", "npm install -g @devcontainers/cli");
+  if (dc.found) {
+    ok("devcontainer", dc.path!);
+  } else {
+    warn("devcontainer", "npm install -g @devcontainers/cli");
+  }
 
   console.log();
 

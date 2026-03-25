@@ -20,7 +20,9 @@ export class WorkbenchClient {
       let resolved = false;
 
       const done = (success: boolean) => {
-        if (resolved) return;
+        if (resolved) {
+          return;
+        }
         resolved = true;
         if (success) {
           this.socket!.setTimeout(0);
@@ -35,7 +37,9 @@ export class WorkbenchClient {
       this.socket.on("error", () => {
         // Only fail the initial connection. After connected, errors are
         // handled per-write — the socket may still be usable.
-        if (!resolved) done(false);
+        if (!resolved) {
+          done(false);
+        }
       });
 
       this.socket.on("timeout", () => {
@@ -65,7 +69,9 @@ export class WorkbenchClient {
     this.buffer = lines.pop()!;
 
     for (const line of lines) {
-      if (!line.trim()) continue;
+      if (!line.trim()) {
+        continue;
+      }
       try {
         const msg = JSON.parse(line);
         if ("event" in msg && !("id" in msg)) {
@@ -119,7 +125,9 @@ export class WorkbenchClient {
   }
 
   on(event: string, handler: EventHandler): void {
-    if (!this.listeners.has(event)) this.listeners.set(event, new Set());
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
     this.listeners.get(event)!.add(handler);
   }
 

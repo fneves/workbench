@@ -26,6 +26,12 @@ export async function doCleanupTask(branch: string): Promise<void> {
     killProcess(state.pid);
   }
 
+  // Kill VS Code server if running
+  if (state?.vscode_pid && isProcessAlive(state.vscode_pid)) {
+    console.log(`  ${C.dim}Killing VS Code server (PID ${state.vscode_pid})${C.nc}`);
+    killProcess(state.vscode_pid);
+  }
+
   // Stop container if this was a container task
   if (state?.mode === "container") {
     const slug = branchToSlug(branch);
@@ -92,7 +98,9 @@ export async function cmdCleanup(): Promise<void> {
   const currentWsId = currentWorkspaceId();
   const allWorkspaces = await listWorkspaces();
   for (const ws of allWorkspaces) {
-    if (ws.id === currentWsId) continue;
+    if (ws.id === currentWsId) {
+      continue;
+    }
     if (ws.title.includes("workbench") || ws.title.includes("⚡")) {
       console.log(`${C.yellow}Closing cmux workspace: ${ws.title}${C.nc}`);
       await closeWorkspace(ws.id);

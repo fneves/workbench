@@ -1,5 +1,5 @@
 import { resolve } from "path";
-import { writeFileSync, chmodSync, unlinkSync } from "fs";
+import { writeFileSync, chmodSync, unlinkSync, mkdirSync, existsSync } from "fs";
 import { listTasks, readState, updateState } from "#lib/state";
 import { getDiffStatsAsync, getFileChangesAsync } from "#lib/git";
 import { getConfig, getScriptDir, branchToSlug, getDefaultEditor } from "#lib/config";
@@ -16,7 +16,10 @@ import {
   newWorkspace,
   closeWorkspace,
   cmuxNotify,
+  splitBrowserPane,
+  createBrowserSurfaceInPane,
 } from "#lib/cmux";
+import { isProcessAlive } from "#lib/process";
 import { generatePrCreatorScript } from "#templates/pr-creator";
 
 type Handler = (params: Record<string, any>) => Promise<any>;
@@ -306,18 +309,149 @@ export const handlers: Record<string, Handler> = {
     return { editor: getDefaultEditor() };
   },
 
+  // --- VS Code ---
+
+  "vscode.start": async (params) => {
+    const { branch, worktree } = params;
+    if (!branch || !worktree) {
+      throw { code: "MISSING_PARAMS", message: "branch and worktree are required" };
+    }
+    const state = await readState(branch);
+
+    // Already running?
+    if (state?.vscode_pid && isProcessAlive(state.vscode_pid) && state.vscode_port) {
+      return { port: state.vscode_port, pid: state.vscode_pid, alreadyRunning: true };
+    }
+
+    // Derive port from branch name hash
+    let hash = 0;
+    for (const ch of branch) {
+      hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0;
+    }
+    let port = 9100 + (Math.abs(hash) % 900);
+
+    // Check port is free, increment if not (up to 10 tries)
+    let portFound = false;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const testProc = Bun.spawn(["lsof", "-i", `:${port}`, "-t"], {
+        stdout: "pipe",
+        stderr: "ignore",
+      });
+      const output = await new Response(testProc.stdout).text();
+      await testProc.exited;
+      if (!output.trim()) {
+        portFound = true;
+        break;
+      }
+      port++;
+      if (port > 9999) {
+        port = 9100;
+      }
+    }
+    if (!portFound) {
+      throw { code: "NO_FREE_PORT", message: "Could not find a free port for VS Code server" };
+    }
+
+    // Create a per-task user-data-dir with workspace trust disabled
+    const slug = branchToSlug(branch);
+    const userDataDir = `/tmp/workbench/${slug}.vscode-data`;
+    const userSettingsDir = resolve(userDataDir, "User");
+    if (!existsSync(userSettingsDir)) {
+      mkdirSync(userSettingsDir, { recursive: true });
+    }
+    const settingsPath = resolve(userSettingsDir, "settings.json");
+    if (!existsSync(settingsPath)) {
+      writeFileSync(
+        settingsPath,
+        JSON.stringify(
+          {
+            "security.workspace.trust.enabled": false,
+          },
+          null,
+          2,
+        ),
+      );
+    }
+
+    const proc = Bun.spawn(
+      [
+        "code",
+        "serve-web",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        String(port),
+        "--without-connection-token",
+        "--accept-server-license-terms",
+        "--user-data-dir",
+        userDataDir,
+      ],
+      {
+        cwd: worktree,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+
+    // Wait briefly to detect immediate startup failures
+    const exited = await Promise.race([
+      proc.exited.then((code) => code),
+      new Promise<null>((r) => setTimeout(() => r(null), 500)),
+    ]);
+    if (exited !== null && exited !== 0) {
+      throw { code: "VSCODE_START_FAILED", message: "code serve-web failed to start" };
+    }
+
+    await updateState(branch, { vscode_pid: proc.pid, vscode_port: port });
+
+    return { port, pid: proc.pid, alreadyRunning: false };
+  },
+
+  "vscode.stop": async (params) => {
+    const { branch } = params;
+    if (!branch) {
+      throw { code: "MISSING_BRANCH", message: "branch is required" };
+    }
+    const state = await readState(branch);
+    if (state?.vscode_pid && isProcessAlive(state.vscode_pid)) {
+      const { killProcess } = await import("#lib/process");
+      killProcess(state.vscode_pid);
+    }
+    await updateState(branch, { vscode_pid: null, vscode_port: null });
+    return { stopped: true };
+  },
+
+  // --- cmux browser panes ---
+
+  "cmux.splitBrowserPane": async (params) => {
+    const result = await splitBrowserPane(
+      params.url,
+      params.direction ?? "down",
+      params.workspaceId,
+    );
+    return result;
+  },
+
+  "cmux.createBrowserSurfaceInPane": async (params) => {
+    const surfaceId = await createBrowserSurfaceInPane(params.paneId, params.url);
+    return { surfaceId };
+  },
+
+  // --- Config ---
+
   "config.tools": async () => {
     const check = async (cmd: string) => {
       const proc = Bun.spawn(["which", cmd], { stdout: "ignore", stderr: "ignore" });
       return (await proc.exited) === 0;
     };
-    const [fzf, lazygit, delta, bat, gh] = await Promise.all([
+    const [fzf, lazygit, delta, bat, gh, code] = await Promise.all([
       check("fzf"),
       check("lazygit"),
       check("delta"),
       check("bat"),
       check("gh"),
+      check("code"),
     ]);
-    return { fzf, lazygit, delta, bat, claude: Bun.which("claude") !== null, gh };
+    return { fzf, lazygit, delta, bat, claude: Bun.which("claude") !== null, gh, code };
   },
 };

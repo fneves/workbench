@@ -39,18 +39,24 @@ export function useTaskList(): TaskState[] {
   const [tasks, setTasks] = useState<TaskState[]>([]);
 
   useEffect(() => {
-    if (!client?.isConnected) return;
+    if (!client?.isConnected) {
+      return;
+    }
 
     // Initial fetch
     client.request("task.list").then((res) => {
       const r = res.result as any;
-      if (res.ok && r?.tasks) setTasks(r.tasks);
+      if (res.ok && r?.tasks) {
+        setTasks(r.tasks);
+      }
     });
 
     const onCreated = (data: any) => {
       setTasks((prev) => {
         // Avoid duplicates
-        if (prev.some((t) => t.branch === data.task.branch)) return prev;
+        if (prev.some((t) => t.branch === data.task.branch)) {
+          return prev;
+        }
         return [...prev, data.task];
       });
     };
@@ -58,7 +64,9 @@ export function useTaskList(): TaskState[] {
     const onUpdated = (data: any) => {
       setTasks((prev) => {
         const idx = prev.findIndex((t) => t.branch === data.task.branch);
-        if (idx < 0) return [...prev, data.task];
+        if (idx < 0) {
+          return [...prev, data.task];
+        }
         const next = [...prev];
         next[idx] = data.task;
         return next;
@@ -88,24 +96,34 @@ export function useTask(branch: string): TaskState | null {
   const [task, setTask] = useState<TaskState | null>(null);
 
   useEffect(() => {
-    if (!client?.isConnected) return;
+    if (!client?.isConnected) {
+      return;
+    }
 
     // Initial fetch
     client.request("task.get", { branch }).then((res) => {
       const r = res.result as any;
-      if (res.ok && r?.task) setTask(r.task);
+      if (res.ok && r?.task) {
+        setTask(r.task);
+      }
     });
 
     const onUpdated = (data: any) => {
-      if (data.task?.branch === branch) setTask(data.task);
+      if (data.task?.branch === branch) {
+        setTask(data.task);
+      }
     };
 
     const onCreated = (data: any) => {
-      if (data.task?.branch === branch) setTask(data.task);
+      if (data.task?.branch === branch) {
+        setTask(data.task);
+      }
     };
 
     const onDeleted = (data: any) => {
-      if (data.branch === branch) setTask(null);
+      if (data.branch === branch) {
+        setTask(null);
+      }
     };
 
     client.on("task.updated", onUpdated);
@@ -127,16 +145,22 @@ export function useFileChanges(branch: string): FileChange[] {
   const [files, setFiles] = useState<FileChange[]>([]);
 
   useEffect(() => {
-    if (!client?.isConnected) return;
+    if (!client?.isConnected) {
+      return;
+    }
 
     // Initial fetch
     client.request("git.fileChanges", { branch }).then((res) => {
       const r = res.result as any;
-      if (res.ok && r?.files) setFiles(r.files);
+      if (res.ok && r?.files) {
+        setFiles(r.files);
+      }
     });
 
     const handler = (data: any) => {
-      if (data.branch === branch) setFiles(data.files);
+      if (data.branch === branch) {
+        setFiles(data.files);
+      }
     };
 
     client.on("files.changed", handler);
