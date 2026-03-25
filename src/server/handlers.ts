@@ -1,5 +1,5 @@
 import { resolve } from "path";
-import { writeFileSync, chmodSync, unlinkSync } from "fs";
+import { writeFileSync, chmodSync, unlinkSync, mkdirSync, existsSync } from "fs";
 import { listTasks, readState, updateState } from "#lib/state";
 import { getDiffStatsAsync, getFileChangesAsync } from "#lib/git";
 import { getConfig, getScriptDir, branchToSlug, getDefaultEditor } from "#lib/config";
@@ -345,12 +345,27 @@ export const handlers: Record<string, Handler> = {
       throw { code: "NO_FREE_PORT", message: "Could not find a free port for VS Code server" };
     }
 
+    // Create a per-task user-data-dir with workspace trust disabled
+    const slug = branchToSlug(branch);
+    const userDataDir = `/tmp/workbench/${slug}.vscode-data`;
+    const userSettingsDir = resolve(userDataDir, "User");
+    if (!existsSync(userSettingsDir)) {
+      mkdirSync(userSettingsDir, { recursive: true });
+    }
+    const settingsPath = resolve(userSettingsDir, "settings.json");
+    if (!existsSync(settingsPath)) {
+      writeFileSync(settingsPath, JSON.stringify({
+        "security.workspace.trust.enabled": false,
+      }, null, 2));
+    }
+
     const proc = Bun.spawn([
       "code", "serve-web",
       "--host", "127.0.0.1",
       "--port", String(port),
       "--without-connection-token",
       "--accept-server-license-terms",
+      "--user-data-dir", userDataDir,
     ], {
       cwd: worktree,
       stdout: "pipe",
