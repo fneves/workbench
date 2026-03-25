@@ -19,7 +19,9 @@ export function registerTuiRenderer(renderer: CliRenderer): void {
 }
 
 function doCleanup(): void {
-  if (tuiCleaned) {return;}
+  if (tuiCleaned) {
+    return;
+  }
   tuiCleaned = true;
   // Force OpenTUI's native teardown (disables mouse, restores screen, etc.)
   // finalizeDestroy bypasses the `rendering` guard that destroy() has.
@@ -29,7 +31,9 @@ function doCleanup(): void {
     } catch {}
   }
   try {
-    if ((process.stdin as any).setRawMode) {(process.stdin as any).setRawMode(false);}
+    if ((process.stdin as any).setRawMode) {
+      (process.stdin as any).setRawMode(false);
+    }
   } catch {}
   try {
     process.stdin.pause();

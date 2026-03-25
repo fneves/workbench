@@ -3,7 +3,9 @@ import { cmuxNotify, isInsideCmux } from "#lib/cmux";
 import { getNotificationsEnabled } from "#lib/config";
 
 export function notify(title: string, body: string, sound = "default", group = "workbench"): void {
-  if (!getNotificationsEnabled()) {return;}
+  if (!getNotificationsEnabled()) {
+    return;
+  }
   try {
     // Use cmux notifications if inside cmux
     if (isInsideCmux()) {

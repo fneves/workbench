@@ -98,7 +98,9 @@ export async function cmdCleanup(): Promise<void> {
   const currentWsId = currentWorkspaceId();
   const allWorkspaces = await listWorkspaces();
   for (const ws of allWorkspaces) {
-    if (ws.id === currentWsId) {continue;}
+    if (ws.id === currentWsId) {
+      continue;
+    }
     if (ws.title.includes("workbench") || ws.title.includes("⚡")) {
       console.log(`${C.yellow}Closing cmux workspace: ${ws.title}${C.nc}`);
       await closeWorkspace(ws.id);

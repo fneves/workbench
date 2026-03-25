@@ -325,7 +325,9 @@ export const handlers: Record<string, Handler> = {
 
     // Derive port from branch name hash
     let hash = 0;
-    for (const ch of branch) {hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0;}
+    for (const ch of branch) {
+      hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0;
+    }
     let port = 9100 + (Math.abs(hash) % 900);
 
     // Check port is free, increment if not (up to 10 tries)
@@ -337,9 +339,14 @@ export const handlers: Record<string, Handler> = {
       });
       const output = await new Response(testProc.stdout).text();
       await testProc.exited;
-      if (!output.trim()) {portFound = true; break;}
+      if (!output.trim()) {
+        portFound = true;
+        break;
+      }
       port++;
-      if (port > 9999) {port = 9100;}
+      if (port > 9999) {
+        port = 9100;
+      }
     }
     if (!portFound) {
       throw { code: "NO_FREE_PORT", message: "Could not find a free port for VS Code server" };
@@ -354,23 +361,37 @@ export const handlers: Record<string, Handler> = {
     }
     const settingsPath = resolve(userSettingsDir, "settings.json");
     if (!existsSync(settingsPath)) {
-      writeFileSync(settingsPath, JSON.stringify({
-        "security.workspace.trust.enabled": false,
-      }, null, 2));
+      writeFileSync(
+        settingsPath,
+        JSON.stringify(
+          {
+            "security.workspace.trust.enabled": false,
+          },
+          null,
+          2,
+        ),
+      );
     }
 
-    const proc = Bun.spawn([
-      "code", "serve-web",
-      "--host", "127.0.0.1",
-      "--port", String(port),
-      "--without-connection-token",
-      "--accept-server-license-terms",
-      "--user-data-dir", userDataDir,
-    ], {
-      cwd: worktree,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const proc = Bun.spawn(
+      [
+        "code",
+        "serve-web",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        String(port),
+        "--without-connection-token",
+        "--accept-server-license-terms",
+        "--user-data-dir",
+        userDataDir,
+      ],
+      {
+        cwd: worktree,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
 
     // Wait briefly to detect immediate startup failures
     const exited = await Promise.race([

@@ -26,8 +26,12 @@ export function generateAgentWrapper(opts: {
   const diffPollSec = getDiffPollSec();
 
   const agentCmd = (() => {
-    if (opts.agent === "opencode") {return "opencode";}
-    if (opts.interactive || !opts.prompt) {return "claude";}
+    if (opts.agent === "opencode") {
+      return "opencode";
+    }
+    if (opts.interactive || !opts.prompt) {
+      return "claude";
+    }
     const escaped = opts.prompt.replace(/'/g, "'\\''");
     return `claude '${escaped}'`;
   })();

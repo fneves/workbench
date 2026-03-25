@@ -49,7 +49,9 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
     "\u280F",
   ];
   useInterval(() => {
-    if (reviewLoading) {setSpinnerTick((t) => (t + 1) % SPINNER_FRAMES.length);}
+    if (reviewLoading) {
+      setSpinnerTick((t) => (t + 1) % SPINNER_FRAMES.length);
+    }
   }, 100);
 
   const [selectedFileIdx, setSelectedFileIdx] = useState(-1);
@@ -85,7 +87,9 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       if (!surfaceId) {
         try {
           const result = await request("cmux.splitPaneWithIds", { direction: "down" });
-          if (!result) {return;}
+          if (!result) {
+            return;
+          }
           surfaceId = result.surfaceId;
           bottomPaneId.current = result.paneId;
         } catch {
@@ -124,7 +128,9 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
   // Subscribe to review.ready events
   useEffect(() => {
-    if (!client?.isConnected) {return;}
+    if (!client?.isConnected) {
+      return;
+    }
     const handler = (data: any) => {
       if (data.branch === branch) {
         setReviewLoading(false);
@@ -140,9 +146,13 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
   // Subscribe to pr.created events
   useEffect(() => {
-    if (!client?.isConnected) {return;}
+    if (!client?.isConnected) {
+      return;
+    }
     const handler = (data: any) => {
-      if (data.branch === branch) {setPrUrl(data.url);}
+      if (data.branch === branch) {
+        setPrUrl(data.url);
+      }
     };
     client.on("pr.created", handler);
     return () => client.off("pr.created", handler);
@@ -200,9 +210,13 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           setReviewActionIdx((i) => (i + 1) % REVIEW_OPTS.length);
           break;
         case "return":
-          if (reviewActionIdx === 0) {handleReviewAccept();}
-          else if (reviewActionIdx === 1) {handleReviewIterate();}
-          else {handleReviewReject();}
+          if (reviewActionIdx === 0) {
+            handleReviewAccept();
+          } else if (reviewActionIdx === 1) {
+            handleReviewIterate();
+          } else {
+            handleReviewReject();
+          }
           break;
       }
       return;
@@ -211,13 +225,17 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
     switch (key.name) {
       case "up":
         setSelectedFileIdx((i) => {
-          if (i <= 0) {return files.length - 1;}
+          if (i <= 0) {
+            return files.length - 1;
+          }
           return i - 1;
         });
         break;
       case "down":
         setSelectedFileIdx((i) => {
-          if (i >= files.length - 1) {return 0;}
+          if (i >= files.length - 1) {
+            return 0;
+          }
           return i + 1;
         });
         break;
@@ -312,7 +330,9 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           (async () => {
             // Start code serve-web (idempotent)
             const result = await request("vscode.start", { branch, worktree });
-            if (!result?.port) {return;}
+            if (!result?.port) {
+              return;
+            }
 
             const url = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
 
@@ -321,7 +341,9 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
               for (let i = 0; i < 20; i++) {
                 try {
                   const res = await fetch(`http://127.0.0.1:${result.port}`);
-                  if (res.ok || res.status === 302) {break;}
+                  if (res.ok || res.status === 302) {
+                    break;
+                  }
                 } catch {}
                 await new Promise((r) => setTimeout(r, 250));
               }
@@ -329,8 +351,12 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
             // If we already have a browser surface, focus it
             if (vscodeSurfaceId.current) {
-              const focused = await request("cmux.focusSurface", { surfaceId: vscodeSurfaceId.current });
-              if (focused?.ok) {return;}
+              const focused = await request("cmux.focusSurface", {
+                surfaceId: vscodeSurfaceId.current,
+              });
+              if (focused?.ok) {
+                return;
+              }
               vscodeSurfaceId.current = null;
             }
 
@@ -350,13 +376,17 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
             if (!surfaceId) {
               const r = await request("cmux.splitBrowserPane", { url, direction: "down" });
-              if (!r) {return;}
+              if (!r) {
+                return;
+              }
               surfaceId = r.surfaceId;
               bottomPaneId.current = r.paneId;
             }
 
             vscodeSurfaceId.current = surfaceId;
-            if (surfaceId) {await request("cmux.focusSurface", { surfaceId });}
+            if (surfaceId) {
+              await request("cmux.focusSurface", { surfaceId });
+            }
           })();
         }
         break;

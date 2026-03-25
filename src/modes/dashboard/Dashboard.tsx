@@ -51,7 +51,9 @@ function Dashboard() {
 
   // Subscribe to task transitions for alerts + event log
   useEffect(() => {
-    if (!client?.isConnected) {return;}
+    if (!client?.isConnected) {
+      return;
+    }
 
     const handler = (data: any) => {
       const { branch, to } = data;
@@ -113,7 +115,9 @@ function Dashboard() {
   const handleJump = useCallback(
     async (task: TaskState) => {
       const wsId = task.cmux_workspace_id;
-      if (!wsId) {return;}
+      if (!wsId) {
+        return;
+      }
 
       // Check if the workspace still exists in cmux
       try {
@@ -201,7 +205,9 @@ function Dashboard() {
 
   useKeyboard((key) => {
     if (showSpawn) {
-      if (key.name === "escape") {setShowSpawn(false);}
+      if (key.name === "escape") {
+        setShowSpawn(false);
+      }
       return;
     }
 
@@ -209,7 +215,9 @@ function Dashboard() {
       case "q":
         exitTui(0);
       case "n":
-        if (!pendingOp) {setShowSpawn(true);}
+        if (!pendingOp) {
+          setShowSpawn(true);
+        }
         break;
       case "k":
         if (!pendingOp && tasks.length > 0 && tasks[selected]) {

@@ -48,7 +48,9 @@ export class WorkbenchServer {
           buffer = lines.pop()!;
 
           for (const line of lines) {
-            if (!line.trim()) {continue;}
+            if (!line.trim()) {
+              continue;
+            }
             try {
               const request = JSON.parse(line) as Request;
               this.handleRequest(socket, request);
@@ -68,7 +70,9 @@ export class WorkbenchServer {
   }
 
   stop(): void {
-    for (const id of this.intervals) {clearInterval(id);}
+    for (const id of this.intervals) {
+      clearInterval(id);
+    }
     this.intervals = [];
     for (const client of this.clients) {
       try {
@@ -150,7 +154,9 @@ export class WorkbenchServer {
   }
 
   private async pollTaskState(): Promise<void> {
-    if (this.pollTaskBusy) {return;}
+    if (this.pollTaskBusy) {
+      return;
+    }
     this.pollTaskBusy = true;
     try {
       await this._pollTaskState();
@@ -182,7 +188,9 @@ export class WorkbenchServer {
     // Detect updates and transitions
     for (const [branch, task] of currentMap) {
       const prev = this.prevTaskMap.get(branch);
-      if (!prev) {continue;}
+      if (!prev) {
+        continue;
+      }
 
       if (JSON.stringify(prev) !== JSON.stringify(task)) {
         this.broadcast({ event: "task.updated", data: { task } });
@@ -215,7 +223,9 @@ export class WorkbenchServer {
   }
 
   private async pollFileChanges(): Promise<void> {
-    if (this.pollFilesBusy) {return;}
+    if (this.pollFilesBusy) {
+      return;
+    }
     this.pollFilesBusy = true;
     try {
       await this._pollFileChanges();
@@ -226,8 +236,12 @@ export class WorkbenchServer {
 
   private async _pollFileChanges(): Promise<void> {
     for (const [branch, task] of this.prevTaskMap) {
-      if (task.status === "killing") {continue;}
-      if (!task.worktree || !existsSync(task.worktree)) {continue;}
+      if (task.status === "killing") {
+        continue;
+      }
+      if (!task.worktree || !existsSync(task.worktree)) {
+        continue;
+      }
 
       try {
         const files = await getFileChangesAsync(task.worktree);
@@ -271,7 +285,9 @@ export class WorkbenchServer {
 
 /** Check if a server is already listening on the socket. */
 export function isServerRunning(socketPath = SERVER_SOCKET_PATH): Promise<boolean> {
-  if (!existsSync(socketPath)) {return Promise.resolve(false);}
+  if (!existsSync(socketPath)) {
+    return Promise.resolve(false);
+  }
 
   const { Socket: NetSocket } = require("net") as typeof import("net");
   return new Promise((resolve) => {
