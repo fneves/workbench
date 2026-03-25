@@ -2,23 +2,47 @@ import { getDiffPollSec } from "#lib/config";
 import { shellUpdateState, shellUpdateDiffStats, shellDiffPoller } from "#templates/shell-helpers";
 
 /**
- * Generate a shell script for running Claude Code headlessly inside a devcontainer.
+ * Shell script to run Claude Code / OpenCode inside a devcontainer.
+ * Headless mode uses `claude -p` (non-interactive). Interactive mode matches host
+ * worktree behavior: TTY session, then `exec zsh` so you stay in the worktree.
  *
- * Key differences from the host agent wrapper:
- * - Uses `claude -p "prompt"` (headless, non-interactive)
- * - Working directory: /workspace
- * - No cmux notifications (no socket access from container)
- * - Writes a sentinel file for notification instead
- * - No `exec zsh` at end — clean exit
+ * State under /tmp/workbench is bind-mounted from the host; repo edits are the same
+ * worktree bind-mount, so the host and container stay in sync.
  */
 export function generateContainerAgentWrapper(opts: {
   stateFile: string;
   worktreeDir: string;
   branch: string;
+  agent: "claude" | "opencode";
   prompt: string;
+  interactive: boolean;
 }): string {
   const diffPollSec = getDiffPollSec();
   const escaped = opts.prompt.replace(/'/g, "'\\''");
+
+  const agentCmd = (() => {
+    if (opts.agent === "opencode") {
+      return "opencode";
+    }
+    if (opts.interactive || !opts.prompt) {
+      return "claude";
+    }
+    return `claude -p '${escaped}' --dangerously-skip-permissions`;
+  })();
+
+  const endShell = opts.interactive
+    ? `
+
+echo ""
+echo -e "\\033[2mAgent exited ($EXIT_CODE). You're still in the worktree. Ctrl+D to close.\\033[0m"
+exec zsh
+`
+    : `
+
+echo ""
+echo -e "\\033[2mAgent exited ($EXIT_CODE).\\033[0m"
+exit $EXIT_CODE
+`;
 
   return `#!/usr/bin/env zsh
 set -uo pipefail
@@ -53,7 +77,7 @@ echo -e "\\033[0;35m\\033[1m⚡ workbench [container]\\033[0m — $BRANCH"
 echo -e "\\033[2m   worktree: $WORKTREE_DIR\\033[0m"
 echo ""
 
-claude -p '${escaped}' --dangerously-skip-permissions
+${agentCmd}
 EXIT_CODE=$?
 
 # --- Finalize ---
@@ -66,9 +90,5 @@ else
     update_state "status" "failed"
     notify_sentinel "failed" "$EXIT_CODE"
 fi
-
-echo ""
-echo -e "\\033[2mAgent exited ($EXIT_CODE).\\033[0m"
-exit $EXIT_CODE
-`;
+${endShell}`;
 }

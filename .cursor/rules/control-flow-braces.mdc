@@ -1,0 +1,27 @@
+---
+description: Require braces on all control-flow bodies (if/else/for/while/do).
+globs: "**/*.{ts,tsx,js,jsx,mjs,cjs}"
+alwaysApply: true
+---
+
+# Braces on control flow
+
+Always wrap the body of `if`, `else`, `else if`, `for`, `while`, and `do` in **curly braces**, even for a single statement.
+
+Do **not** use one-line forms such as `if (cond) return x;`.
+
+Oxlint enforces this with the `curly` rule (`["error", "all"]`) in `.oxlintrc.json`.
+
+```typescript
+// Avoid
+if (!ready) return;
+if (x) doThing();
+
+// Prefer
+if (!ready) {
+  return;
+}
+if (x) {
+  doThing();
+}
+```

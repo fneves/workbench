@@ -6,6 +6,7 @@ import {
   branchToSlug,
   getContainerImage,
   getContainerClaudeHome,
+  getWorktreesParentDir,
 } from "#lib/config";
 
 /**
@@ -13,7 +14,9 @@ import {
  * Claude Code stores its OAuth-derived key under service "Claude Code".
  */
 export function getClaudeKeyFromKeychain(): string | null {
-  if (process.platform !== "darwin") return null;
+  if (process.platform !== "darwin") {
+    return null;
+  }
   try {
     const account = userInfo().username;
     const result = Bun.spawnSync(
@@ -39,6 +42,23 @@ export function isDockerRunning(): boolean {
     stderr: "ignore",
   });
   return result.exitCode === 0;
+}
+
+/**
+ * True when workbench is running inside a container (e.g. devcontainer exec session).
+ * In that case we run agents in-process paths and skip devcontainer/docker orchestration.
+ */
+export function isRunningInsideContainer(): boolean {
+  if (process.env.WORKBENCH_IN_CONTAINER === "1") {
+    return true;
+  }
+  if (existsSync("/.dockerenv")) {
+    return true;
+  }
+  if (process.env.REMOTE_CONTAINERS === "true") {
+    return true;
+  }
+  return false;
 }
 
 export interface DevcontainerConfig {
@@ -67,8 +87,12 @@ export function generateDevcontainerConfig(
   const homeDir = resolve(claudeHome, "..");
   const claudeJsonPath = resolve(homeDir, ".claude.json");
 
+  const worktreesHostParent = getWorktreesParentDir();
+  const worktreesMount = `source=${worktreesHostParent},target=/workbench-worktrees,type=bind`;
+
   const requiredMounts = [
     `source=/tmp/workbench,target=/tmp/workbench,type=bind`,
+    worktreesMount,
     `source=${claudeHome},target=/home/vscode/.claude,type=bind`,
     ...(existsSync(claudeJsonPath)
       ? [`source=${claudeJsonPath},target=/home/vscode/.claude.json,type=bind,readonly`]
@@ -80,6 +104,8 @@ export function generateDevcontainerConfig(
 
   const requiredEnv: Record<string, string> = {
     CLAUDE_CODE_USE_BEDROCK: "0",
+    WORKBENCH_WORKTREES_MOUNT: "/workbench-worktrees",
+    WORKBENCH_HOST_WORKTREES_ROOT: worktreesHostParent,
     ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
   };
 
@@ -268,7 +294,9 @@ export function stopContainer(slug: string): boolean {
   });
 
   const ids = find.stdout.toString().trim();
-  if (!ids) return true;
+  if (!ids) {
+    return true;
+  }
 
   const result = Bun.spawnSync(["docker", "rm", "-f", ...ids.split("\n")], {
     stdout: "ignore",
@@ -286,7 +314,9 @@ export function cleanupAllContainers(): boolean {
   });
 
   const ids = find.stdout.toString().trim();
-  if (!ids) return true;
+  if (!ids) {
+    return true;
+  }
 
   const result = Bun.spawnSync(["docker", "rm", "-f", ...ids.split("\n")], {
     stdout: "ignore",

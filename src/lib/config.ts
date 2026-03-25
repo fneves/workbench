@@ -71,7 +71,9 @@ export const CONFIG_TEMPLATE = `# workbench configuration — ~/.workbench/confi
 let _config: WorkbenchConfig | null = null;
 
 export function getConfig(): WorkbenchConfig {
-  if (_config) return _config;
+  if (_config) {
+    return _config;
+  }
 
   if (!existsSync(CONFIG_FILE)) {
     _config = {};
@@ -90,7 +92,9 @@ export function getConfig(): WorkbenchConfig {
 
 /** Write the default config template if the config file does not yet exist. */
 export function ensureConfigFile(): void {
-  if (existsSync(CONFIG_FILE)) return;
+  if (existsSync(CONFIG_FILE)) {
+    return;
+  }
   mkdirSync(WORKBENCH_DIR, { recursive: true });
   writeFileSync(CONFIG_FILE, CONFIG_TEMPLATE);
 }
@@ -164,7 +168,9 @@ export const DEFAULT_MODE = getDefaultMode();
 // --- Repo helpers ---
 
 export function getRepoRoot(): string {
-  if (process.env.WORKBENCH_REPO) return process.env.WORKBENCH_REPO;
+  if (process.env.WORKBENCH_REPO) {
+    return process.env.WORKBENCH_REPO;
+  }
 
   const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"]);
   const root = result.stdout.toString().trim();
@@ -175,8 +181,41 @@ export function getRepoRoot(): string {
   return root;
 }
 
+/**
+ * The main repository root (primary checkout), even when cwd is a linked git worktree.
+ * Used for stable worktree directory layout and naming.
+ */
+export function getMainRepoRoot(): string {
+  const cwd = process.env.WORKBENCH_REPO;
+  const gitCwd = cwd ? { cwd } : {};
+
+  let result = Bun.spawnSync(
+    ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+    gitCwd,
+  );
+  let commonDir = result.stdout.toString().trim();
+  if (commonDir && result.exitCode === 0) {
+    return resolve(commonDir, "..");
+  }
+
+  result = Bun.spawnSync(["git", "rev-parse", "--git-common-dir"], gitCwd);
+  commonDir = result.stdout.toString().trim();
+  if (commonDir && result.exitCode === 0) {
+    return resolve(commonDir, "..");
+  }
+
+  return getRepoRoot();
+}
+
+/** Parent directory that holds per-repo worktree folders (`<parent>/<repo-name>/<branch-slug>/`). */
+export function getWorktreesParentDir(): string {
+  const mainRoot = getMainRepoRoot();
+  const configDir = getConfig().worktree_dir?.replace(/^~/, homedir());
+  return configDir ?? resolve(mainRoot, "..", ".workbench-worktrees");
+}
+
 export function getRepoName(): string {
-  return basename(getRepoRoot());
+  return basename(getMainRepoRoot());
 }
 
 /** Converts a branch name to a safe filesystem slug (replaces / with -). */
@@ -185,11 +224,21 @@ export function branchToSlug(branch: string): string {
 }
 
 export function getWorktreeDir(branch: string): string {
-  const repo = getRepoRoot();
-  const name = basename(repo);
-  const configDir = getConfig().worktree_dir?.replace(/^~/, homedir());
-  const parent = configDir ?? resolve(repo, "..", ".workbench-worktrees");
+  const name = basename(getMainRepoRoot());
+  const parent = process.env.WORKBENCH_WORKTREES_MOUNT ?? getWorktreesParentDir();
   return resolve(parent, name, branchToSlug(branch));
+}
+
+/**
+ * Host-visible worktree path for state/dashboard when running inside a devcontainer
+ * that sets WORKBENCH_HOST_WORKTREES_ROOT (see devcontainer merge in container.ts).
+ */
+export function getHostWorktreePath(branch: string): string {
+  const hostRoot = process.env.WORKBENCH_HOST_WORKTREES_ROOT;
+  if (hostRoot) {
+    return resolve(hostRoot, basename(getMainRepoRoot()), branchToSlug(branch));
+  }
+  return getWorktreeDir(branch);
 }
 
 export function getStateFile(branch: string): string {

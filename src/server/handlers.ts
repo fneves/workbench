@@ -61,7 +61,9 @@ export const handlers: Record<string, Handler> = {
 
   "task.update": async (params) => {
     const { branch, ...updates } = params;
-    if (!branch) throw { code: "MISSING_BRANCH", message: "branch is required" };
+    if (!branch) {
+      throw { code: "MISSING_BRANCH", message: "branch is required" };
+    }
     await updateState(branch, updates);
     const task = await readState(branch);
     return { task };
@@ -79,10 +81,10 @@ export const handlers: Record<string, Handler> = {
       "-f",
       params.baseBranch ?? "main",
     ];
-    if (params.interactive || !params.prompt) {
+    if (params.interactive) {
       args.push("-i");
     } else {
-      args.push("-p", params.prompt);
+      args.push("-p", params.prompt ?? "");
     }
     const result = await runWorkbenchCmd(args);
     if (!result.ok) {
@@ -118,7 +120,9 @@ export const handlers: Record<string, Handler> = {
       const state = await readState(params.branch);
       worktree = state?.worktree;
     }
-    if (!worktree) throw { code: "NO_WORKTREE", message: "No worktree found" };
+    if (!worktree) {
+      throw { code: "NO_WORKTREE", message: "No worktree found" };
+    }
     return getDiffStatsAsync(worktree);
   },
 
@@ -128,7 +132,9 @@ export const handlers: Record<string, Handler> = {
       const state = await readState(params.branch);
       worktree = state?.worktree;
     }
-    if (!worktree) throw { code: "NO_WORKTREE", message: "No worktree found" };
+    if (!worktree) {
+      throw { code: "NO_WORKTREE", message: "No worktree found" };
+    }
     return { files: await getFileChangesAsync(worktree) };
   },
 
@@ -138,7 +144,9 @@ export const handlers: Record<string, Handler> = {
       const state = await readState(params.branch);
       worktree = state?.worktree;
     }
-    if (!worktree) throw { code: "NO_WORKTREE", message: "No worktree found" };
+    if (!worktree) {
+      throw { code: "NO_WORKTREE", message: "No worktree found" };
+    }
     const proc = Bun.spawn(["git", "add", "-A"], {
       cwd: worktree,
       stdout: "ignore",

@@ -17,8 +17,8 @@
   "scripts": {
     "dev": "bun run src/index.tsx",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint src/",
-    "lint:fix": "oxlint --fix src/",
+    "lint": "find src \\( -name '*.ts' -o -name '*.tsx' \\) -print0 | xargs -0 bunx oxlint",
+    "lint:fix": "find src \\( -name '*.ts' -o -name '*.tsx' \\) -print0 | xargs -0 bunx oxlint --fix",
     "fmt": "oxfmt src/",
     "fmt:check": "oxfmt --check src/",
     "check": "bun run typecheck && bun run lint && bun run fmt:check",

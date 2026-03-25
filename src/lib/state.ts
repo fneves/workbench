@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from "fs";
 import { basename, resolve } from "path";
-import { WORKBENCH_STATE_DIR, getStateFile, getRepoRoot } from "#lib/config";
+import {
+  WORKBENCH_STATE_DIR,
+  getStateFile,
+  getMainRepoRoot,
+  getWorktreesParentDir,
+} from "#lib/config";
 import { getDiffStatsAsync, getCurrentBranchAsync } from "#lib/git";
 import { isProcessAlive } from "#lib/process";
 
@@ -26,7 +31,9 @@ export interface TaskState {
 export async function readState(branch: string): Promise<TaskState | null> {
   try {
     const file = Bun.file(getStateFile(branch));
-    if (!(await file.exists())) return null;
+    if (!(await file.exists())) {
+      return null;
+    }
     return (await file.json()) as TaskState;
   } catch {
     return null;
@@ -39,7 +46,9 @@ export async function writeState(branch: string, state: TaskState): Promise<void
 
 export async function updateState(branch: string, updates: Partial<TaskState>): Promise<void> {
   const state = await readState(branch);
-  if (!state) return;
+  if (!state) {
+    return;
+  }
   const updated = { ...state, ...updates, updated_at: new Date().toISOString() };
   await writeState(branch, updated);
 }
@@ -50,10 +59,14 @@ export async function listTasks(): Promise<TaskState[]> {
   try {
     const files = await readdir(WORKBENCH_STATE_DIR);
     for (const f of files) {
-      if (!f.endsWith(".json")) continue;
+      if (!f.endsWith(".json")) {
+        continue;
+      }
       const branch = f.replace(/\.json$/, "");
       const state = await readState(branch);
-      if (state) tasks.push(state);
+      if (state) {
+        tasks.push(state);
+      }
     }
   } catch {
     // State dir doesn't exist yet
@@ -99,15 +112,13 @@ export function newTaskState(opts: {
 export async function reconcileWorktrees(): Promise<void> {
   mkdirSync(WORKBENCH_STATE_DIR, { recursive: true });
 
-  let repoRoot: string;
-  try {
-    repoRoot = getRepoRoot();
-  } catch {
+  const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"]);
+  if (result.exitCode !== 0 || !result.stdout.toString().trim()) {
     return;
   }
 
-  const repoName = basename(repoRoot);
-  const worktreesBase = resolve(repoRoot, "..", ".workbench-worktrees", repoName);
+  const repoName = basename(getMainRepoRoot());
+  const worktreesBase = resolve(getWorktreesParentDir(), repoName);
 
   // 1. Discover orphan worktrees (exist on disk but no state file)
   if (existsSync(worktreesBase)) {
@@ -121,15 +132,21 @@ export async function reconcileWorktrees(): Promise<void> {
     for (const branch of entries) {
       const worktreeDir = resolve(worktreesBase, branch);
       try {
-        if (!statSync(worktreeDir).isDirectory()) continue;
+        if (!statSync(worktreeDir).isDirectory()) {
+          continue;
+        }
         // Must have a .git file to be a real worktree (not a grouping dir like "fn/")
-        if (!existsSync(resolve(worktreeDir, ".git"))) continue;
+        if (!existsSync(resolve(worktreeDir, ".git"))) {
+          continue;
+        }
       } catch {
         continue;
       }
 
       const existing = await readState(branch);
-      if (existing) continue;
+      if (existing) {
+        continue;
+      }
 
       // No state file — create one from what we can infer
       const actualBranch = (await getCurrentBranchAsync(worktreeDir)) ?? branch;

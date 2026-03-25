@@ -4,6 +4,7 @@ import {
   DEFAULT_AGENT,
   DEFAULT_BASE_BRANCH,
   getWorktreeDir,
+  getHostWorktreePath,
   getStateFile,
   branchToSlug,
 } from "#lib/config";
@@ -24,6 +25,7 @@ import { generateContainerAgentWrapper } from "#templates/container-agent-wrappe
 import {
   isDevcontainerCliAvailable,
   isDockerRunning,
+  isRunningInsideContainer,
   generateDevcontainerConfig,
   writeDevcontainerConfig,
 } from "#lib/container";
@@ -112,7 +114,9 @@ function printSpawnUsage(): void {
   console.log(`  ${C.cyan}-a, --agent${C.nc}        Agent: claude|opencode (default: claude)`);
   console.log(`  ${C.cyan}-m, --mode${C.nc}         Mode: worktree|container (default: worktree)`);
   console.log(`  ${C.cyan}-f, --from${C.nc}         Base branch (default: main)`);
-  console.log(`  ${C.cyan}-i, --interactive${C.nc}  Interactive mode (no prompt)`);
+  console.log(
+    `  ${C.cyan}-i, --interactive${C.nc}  Interactive mode (no -p); supports container devcontainers`,
+  );
 }
 
 export async function cmdSpawn(args: string[]): Promise<void> {
@@ -144,7 +148,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
     branch,
     agent,
     mode,
-    worktree: worktreeDir,
+    worktree: getHostWorktreePath(branch),
     prompt,
   });
   await writeState(branch, state);
@@ -156,53 +160,74 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   if (mode === "container") {
     // --- Container mode ---
 
-    // Validate prerequisites
-    if (!isDevcontainerCliAvailable()) {
-      console.error(`${C.red}Error: 'devcontainer' CLI not found. Install it with:${C.nc}`);
-      console.error(`  ${C.cyan}npm install -g @devcontainers/cli${C.nc}`);
-      process.exit(1);
-    }
-    if (!isDockerRunning()) {
-      console.error(`${C.red}Error: Docker daemon is not running.${C.nc}`);
-      process.exit(1);
-    }
-    if (!prompt) {
+    const insideContainer = isRunningInsideContainer();
+
+    if (!interactive && !prompt) {
       console.error(
-        `${C.red}Error: Container mode requires a prompt (-p). Interactive mode is not supported in containers.${C.nc}`,
+        `${C.red}Error: Container headless mode requires a prompt (-p). Use -i for interactive Claude inside the container.${C.nc}`,
       );
       process.exit(1);
     }
 
-    // Generate and write devcontainer config
-    const dcConfig = generateDevcontainerConfig(worktreeDir, branch);
-    const dcConfigPath = writeDevcontainerConfig(branch, dcConfig);
-    await updateState(branch, { devcontainer_config: dcConfigPath });
+    if (!insideContainer) {
+      if (!isDevcontainerCliAvailable()) {
+        console.error(`${C.red}Error: 'devcontainer' CLI not found. Install it with:${C.nc}`);
+        console.error(`  ${C.cyan}npm install -g @devcontainers/cli${C.nc}`);
+        process.exit(1);
+      }
+      if (!isDockerRunning()) {
+        console.error(`${C.red}Error: Docker daemon is not running.${C.nc}`);
+        process.exit(1);
+      }
+    }
 
-    console.log(`${C.dim}Config:  ${dcConfigPath}${C.nc}`);
+    let dcConfigPath: string | null = null;
+    if (!insideContainer) {
+      const dcConfig = generateDevcontainerConfig(worktreeDir, branch);
+      dcConfigPath = writeDevcontainerConfig(branch, dcConfig);
+      await updateState(branch, { devcontainer_config: dcConfigPath });
+      console.log(`${C.dim}Config:  ${dcConfigPath}${C.nc}`);
+    }
 
-    // Write container agent wrapper
-    // devcontainer mounts at /workspaces/<folder-name>
     const { basename: pathBasename } = await import("path");
-    const remoteWorkspaceDir = `/workspaces/${pathBasename(worktreeDir)}`;
+    const remoteWorkspaceDir = insideContainer
+      ? worktreeDir
+      : `/workspaces/${pathBasename(worktreeDir)}`;
+
     writeFileSync(
       wrapperFile,
       generateContainerAgentWrapper({
         stateFile,
         worktreeDir: remoteWorkspaceDir,
         branch,
+        agent,
         prompt,
+        interactive,
       }),
     );
     chmodSync(wrapperFile, 0o755);
     console.log(`${C.dim}Agent:   ${wrapperFile}${C.nc}`);
 
-    // Build the compound command for cmux
+    const localRunCmd = `zsh '${wrapperFile}'`;
+
+    if (insideContainer) {
+      console.log();
+      console.log(
+        `${C.bold}Inside a devcontainer:${C.nc} worktrees under ${C.cyan}/workbench-worktrees${C.nc} mirror the host.`,
+      );
+      console.log(`  ${C.bold}Run the agent:${C.nc} ${C.cyan}${localRunCmd}${C.nc}`);
+      if (!isInsideCmux()) {
+        return;
+      }
+      await launchInCmux(branch, getHostWorktreePath(branch), localRunCmd);
+      return;
+    }
+
     const containerCmd = [
       `devcontainer up --workspace-folder '${worktreeDir}' --config '${dcConfigPath}' --id-label 'workbench=${slug}'`,
       `&& devcontainer exec --workspace-folder '${worktreeDir}' --config '${dcConfigPath}' --id-label 'workbench=${slug}' zsh /tmp/workbench/${slug}.run.sh`,
     ].join(" ");
 
-    // Launch in cmux or print standalone instructions
     if (!isInsideCmux()) {
       console.log(`${C.yellow}Not inside cmux.${C.nc}`);
       console.log();
@@ -214,7 +239,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
       return;
     }
 
-    await launchInCmux(branch, worktreeDir, containerCmd);
+    await launchInCmux(branch, getHostWorktreePath(branch), containerCmd);
   } else {
     // --- Worktree mode (existing behavior) ---
 

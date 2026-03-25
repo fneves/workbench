@@ -20,9 +20,13 @@ interface SpawnDialogProps {
 type Step = "branch" | "interactive" | "prompt" | "agent";
 
 const MODE_OPTS = [
-  { label: "interactive", desc: "agent opens in terminal, no prompt" },
-  { label: "with prompt", desc: "provide a task description" },
-  { label: "container", desc: "runs autonomously in a devcontainer" },
+  { label: "interactive", desc: "worktree: agent in terminal, no prompt" },
+  { label: "with prompt", desc: "worktree: one-shot task description" },
+  { label: "container (headless)", desc: "devcontainer: autonomous -p task" },
+  {
+    label: "container (interactive)",
+    desc: "devcontainer: iterative Claude; syncs to host worktree",
+  },
 ];
 
 const AGENT_OPTS = [
@@ -70,7 +74,7 @@ export function SpawnDialog({
 }: SpawnDialogProps) {
   const [step, setStep] = useState<Step>("branch");
   const [branch, setBranch] = useState("");
-  const [modeIdx, setModeIdx] = useState(0); // 0=interactive, 1=with prompt, 2=container
+  const [modeIdx, setModeIdx] = useState(0);
   const [prompt, setPrompt] = useState("");
   const defaultAgentIdx = AGENT_OPTS.findIndex((o) => o.value === defaultAgent);
   const [agentIdx, setAgentIdx] = useState(defaultAgentIdx >= 0 ? defaultAgentIdx : 0);
@@ -79,30 +83,43 @@ export function SpawnDialog({
     const order: Step[] = ["branch", "interactive", "prompt", "agent"];
     const currentIdx = order.indexOf(step);
     const sIdx = order.indexOf(s);
-    if (s === step) return "#ffffff";
-    if (sIdx < currentIdx) return "#06b6d4";
+    if (s === step) {
+      return "#ffffff";
+    }
+    if (sIdx < currentIdx) {
+      return "#06b6d4";
+    }
     return "#333333";
   };
 
   useKeyboard((key) => {
     if (step === "interactive") {
-      if (key.name === "up") setModeIdx((i) => Math.max(0, i - 1));
-      else if (key.name === "down") setModeIdx((i) => Math.min(MODE_OPTS.length - 1, i + 1));
-      else if (key.name === "return") setStep(modeIdx === 0 ? "agent" : "prompt");
-      else if (key.name === "escape") onCancel();
+      if (key.name === "up") {
+        setModeIdx((i) => Math.max(0, i - 1));
+      } else if (key.name === "down") {
+        setModeIdx((i) => Math.min(MODE_OPTS.length - 1, i + 1));
+      } else if (key.name === "return") {
+        setStep(modeIdx === 0 || modeIdx === 3 ? "agent" : "prompt");
+      } else if (key.name === "escape") {
+        onCancel();
+      }
     } else if (step === "agent") {
-      if (key.name === "up") setAgentIdx((i) => Math.max(0, i - 1));
-      else if (key.name === "down") setAgentIdx((i) => Math.min(AGENT_OPTS.length - 1, i + 1));
-      else if (key.name === "return") {
+      if (key.name === "up") {
+        setAgentIdx((i) => Math.max(0, i - 1));
+      } else if (key.name === "down") {
+        setAgentIdx((i) => Math.min(AGENT_OPTS.length - 1, i + 1));
+      } else if (key.name === "return") {
         onSpawn({
           branch: branch.trim(),
-          prompt: modeIdx !== 0 ? prompt.trim() : "",
+          prompt: modeIdx === 1 || modeIdx === 2 ? prompt.trim() : "",
           agent: AGENT_OPTS[agentIdx]!.value,
-          mode: modeIdx === 2 ? "container" : "worktree",
+          mode: modeIdx === 2 || modeIdx === 3 ? "container" : "worktree",
           baseBranch: defaultBaseBranch,
-          interactive: modeIdx === 0,
+          interactive: modeIdx === 0 || modeIdx === 3,
         });
-      } else if (key.name === "escape") onCancel();
+      } else if (key.name === "escape") {
+        onCancel();
+      }
     }
   });
 
@@ -122,7 +139,9 @@ export function SpawnDialog({
       <text>
         <span fg={stepColor("branch")}>{"branch"}</span>
         <span fg={stepColor("interactive")}>{" → mode"}</span>
-        <span fg={modeIdx !== 0 ? stepColor("prompt") : "#333333"}>{" → prompt"}</span>
+        <span fg={modeIdx === 1 || modeIdx === 2 ? stepColor("prompt") : "#333333"}>
+          {" → prompt"}
+        </span>
         <span fg={stepColor("agent")}>{" → agent"}</span>
       </text>
 
@@ -133,7 +152,9 @@ export function SpawnDialog({
             placeholder="e.g. fix-auth-bug"
             onInput={setBranch}
             onSubmit={() => {
-              if (branch.trim()) setStep("interactive");
+              if (branch.trim()) {
+                setStep("interactive");
+              }
             }}
             focused
           />
