@@ -316,6 +316,17 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
             const url = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
 
+            // Wait for server to be ready if freshly started
+            if (!result.alreadyRunning) {
+              for (let i = 0; i < 20; i++) {
+                try {
+                  const res = await fetch(`http://127.0.0.1:${result.port}`);
+                  if (res.ok || res.status === 302) {break;}
+                } catch {}
+                await new Promise((r) => setTimeout(r, 250));
+              }
+            }
+
             // If we already have a browser surface, focus it
             if (vscodeSurfaceId.current) {
               const focused = await request("cmux.focusSurface", { surfaceId: vscodeSurfaceId.current });

@@ -167,7 +167,7 @@ export async function sendKey(key: string, surfaceId?: string): Promise<boolean>
 // --- Browser panes ---
 
 const CMUX_CLI =
-  process.env.CMUX_CLI_PATH ?? "/Applications/cmux.app/Contents/Resources/bin/cmux";
+  process.env.CMUX_CLI_PATH ?? Bun.which("cmux") ?? "/Applications/cmux.app/Contents/Resources/bin/cmux";
 
 /** Run a cmux CLI command and return parsed JSON output. */
 async function cmuxCli(args: string[]): Promise<Record<string, any> | null> {

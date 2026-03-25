@@ -329,6 +329,7 @@ export const handlers: Record<string, Handler> = {
     let port = 9100 + (Math.abs(hash) % 900);
 
     // Check port is free, increment if not (up to 10 tries)
+    let portFound = false;
     for (let attempt = 0; attempt < 10; attempt++) {
       const testProc = Bun.spawn(["lsof", "-i", `:${port}`, "-t"], {
         stdout: "pipe",
@@ -336,8 +337,12 @@ export const handlers: Record<string, Handler> = {
       });
       const output = await new Response(testProc.stdout).text();
       await testProc.exited;
-      if (!output.trim()) {break;}
+      if (!output.trim()) {portFound = true; break;}
       port++;
+      if (port > 9999) {port = 9100;}
+    }
+    if (!portFound) {
+      throw { code: "NO_FREE_PORT", message: "Could not find a free port for VS Code server" };
     }
 
     const proc = Bun.spawn([
@@ -348,13 +353,36 @@ export const handlers: Record<string, Handler> = {
       "--accept-server-license-terms",
     ], {
       cwd: worktree,
-      stdout: "ignore",
-      stderr: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
     });
+
+    // Wait briefly to detect immediate startup failures
+    const exited = await Promise.race([
+      proc.exited.then((code) => code),
+      new Promise<null>((r) => setTimeout(() => r(null), 500)),
+    ]);
+    if (exited !== null && exited !== 0) {
+      throw { code: "VSCODE_START_FAILED", message: "code serve-web failed to start" };
+    }
 
     await updateState(branch, { vscode_pid: proc.pid, vscode_port: port });
 
     return { port, pid: proc.pid, alreadyRunning: false };
+  },
+
+  "vscode.stop": async (params) => {
+    const { branch } = params;
+    if (!branch) {
+      throw { code: "MISSING_BRANCH", message: "branch is required" };
+    }
+    const state = await readState(branch);
+    if (state?.vscode_pid && isProcessAlive(state.vscode_pid)) {
+      const { killProcess } = await import("#lib/process");
+      killProcess(state.vscode_pid);
+    }
+    await updateState(branch, { vscode_pid: null, vscode_port: null });
+    return { stopped: true };
   },
 
   // --- cmux browser panes ---
