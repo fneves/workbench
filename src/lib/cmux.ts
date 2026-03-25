@@ -32,7 +32,7 @@ export function cmuxRequest(
     let resolved = false;
 
     const done = (result: CmuxResponse | null) => {
-      if (resolved) return;
+      if (resolved) {return;}
       resolved = true;
       socket.destroy();
       resolve(result);
@@ -45,7 +45,7 @@ export function cmuxRequest(
       data += chunk.toString();
       // Try to parse response as soon as we get data
       for (const line of data.split("\n")) {
-        if (!line.trim()) continue;
+        if (!line.trim()) {continue;}
         try {
           const parsed = JSON.parse(line) as CmuxResponse;
           if (parsed.id === id) {
@@ -67,7 +67,7 @@ export function cmuxRequest(
 
 export async function listWorkspaces(): Promise<{ id: string; title: string }[]> {
   const res = await cmuxRequest("workspace.list");
-  if (!res?.ok) return [];
+  if (!res?.ok) {return [];}
   return res.result?.workspaces ?? [];
 }
 
@@ -79,7 +79,7 @@ export async function findWorkspace(title: string): Promise<string | null> {
 
 export async function createWorkspace(): Promise<string | null> {
   const res = await cmuxRequest("workspace.create");
-  if (!res?.ok) return null;
+  if (!res?.ok) {return null;}
   return res.result?.workspace_id ?? null;
 }
 
@@ -91,7 +91,7 @@ export async function renameWorkspace(workspaceId: string, title: string): Promi
 /** Create a new workspace with a title (create + rename). */
 export async function newWorkspace(title: string): Promise<string | null> {
   const wsId = await createWorkspace();
-  if (!wsId) return null;
+  if (!wsId) {return null;}
   await renameWorkspace(wsId, title);
   return wsId;
 }
@@ -113,9 +113,9 @@ export async function splitPane(
   workspaceId?: string,
 ): Promise<string | null> {
   const params: Record<string, any> = { direction };
-  if (workspaceId) params.workspace_id = workspaceId;
+  if (workspaceId) {params.workspace_id = workspaceId;}
   const res = await cmuxRequest("surface.split", params);
-  if (!res?.ok) return null;
+  if (!res?.ok) {return null;}
   return res.result?.surface_id ?? null;
 }
 
@@ -124,17 +124,17 @@ export async function splitPaneWithIds(
   direction: "right" | "left" | "up" | "down" = "right",
 ): Promise<{ surfaceId: string; paneId: string } | null> {
   const res = await cmuxRequest("surface.split", { direction });
-  if (!res?.ok) return null;
+  if (!res?.ok) {return null;}
   const surfaceId = res.result?.surface_id;
   const paneId = res.result?.pane_id;
-  if (!surfaceId || !paneId) return null;
+  if (!surfaceId || !paneId) {return null;}
   return { surfaceId, paneId };
 }
 
 /** Create a new tab (surface) inside an existing pane. */
 export async function createSurfaceInPane(paneId: string): Promise<string | null> {
   const res = await cmuxRequest("surface.create", { pane_id: paneId });
-  if (!res?.ok) return null;
+  if (!res?.ok) {return null;}
   return res.result?.surface_id ?? null;
 }
 
@@ -152,14 +152,14 @@ export async function focusSurface(surfaceId: string): Promise<boolean> {
 
 export async function sendText(text: string, surfaceId?: string): Promise<boolean> {
   const params: Record<string, any> = { text };
-  if (surfaceId) params.surface_id = surfaceId;
+  if (surfaceId) {params.surface_id = surfaceId;}
   const res = await cmuxRequest("surface.send_text", params);
   return res?.ok ?? false;
 }
 
 export async function sendKey(key: string, surfaceId?: string): Promise<boolean> {
   const params: Record<string, any> = { key };
-  if (surfaceId) params.surface_id = surfaceId;
+  if (surfaceId) {params.surface_id = surfaceId;}
   const res = await cmuxRequest("surface.send_key", params);
   return res?.ok ?? false;
 }
@@ -182,9 +182,9 @@ interface SurfaceInfo {
 
 export async function listSurfaces(workspaceId?: string): Promise<SurfaceInfo[]> {
   const params: Record<string, any> = {};
-  if (workspaceId) params.workspace_id = workspaceId;
+  if (workspaceId) {params.workspace_id = workspaceId;}
   const res = await cmuxRequest("surface.list", params);
-  if (!res?.ok) return [];
+  if (!res?.ok) {return [];}
   return res.result?.surfaces ?? [];
 }
 
@@ -198,7 +198,7 @@ export async function waitForSurface(surfaceId: string, timeoutMs = 5000): Promi
   while (Date.now() - start < timeoutMs) {
     const surfaces = await listSurfaces();
     const surface = surfaces.find((s) => s.id === surfaceId);
-    if (surface && surface.title !== "Terminal") return true;
+    if (surface && surface.title !== "Terminal") {return true;}
     await new Promise((r) => setTimeout(r, 100));
   }
   return false;

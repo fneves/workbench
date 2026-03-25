@@ -37,7 +37,7 @@ export function createWorktree(worktreeDir: string, branch: string, baseBranch: 
   const repo = getRepoRoot();
   // Try creating new branch from base
   let result = run(["git", "-C", repo, "worktree", "add", worktreeDir, "-b", branch, baseBranch]);
-  if (result.ok) return true;
+  if (result.ok) {return true;}
   // Try checking out existing branch
   result = run(["git", "-C", repo, "worktree", "add", worktreeDir, branch]);
   if (result.ok) {
@@ -69,7 +69,7 @@ export interface DiffStats {
 
 export function getDiffStats(worktreeDir: string): DiffStats {
   const result = run(["git", "diff", "--shortstat", "HEAD"], worktreeDir);
-  if (!result.ok || !result.stdout) return { files: 0, added: 0, removed: 0 };
+  if (!result.ok || !result.stdout) {return { files: 0, added: 0, removed: 0 };}
 
   const summary = result.stdout;
   const files = parseInt(summary.match(/(\d+) file/)?.[1] ?? "0", 10);
@@ -85,20 +85,20 @@ export function getDiffStat(worktreeDir: string): string {
 
 export function getUntrackedFiles(worktreeDir: string): string[] {
   const result = run(["git", "ls-files", "--others", "--exclude-standard"], worktreeDir);
-  if (!result.ok || !result.stdout) return [];
+  if (!result.ok || !result.stdout) {return [];}
   return result.stdout.split("\n").filter(Boolean);
 }
 
 export function getCurrentBranch(worktreeDir: string): string | null {
   const result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], worktreeDir);
   const branch = result.stdout;
-  if (!result.ok || !branch || branch === "HEAD") return null;
+  if (!result.ok || !branch || branch === "HEAD") {return null;}
   return branch;
 }
 
 export function getChangedFiles(worktreeDir: string): string[] {
   const result = run(["git", "diff", "--name-only", "HEAD"], worktreeDir);
-  if (!result.ok || !result.stdout) return [];
+  if (!result.ok || !result.stdout) {return [];}
   return result.stdout.split("\n").filter(Boolean);
 }
 
@@ -122,7 +122,7 @@ export interface FileChange {
 
 export function getFileChanges(worktreeDir: string): FileChange[] {
   const statusResult = runRaw(["git", "status", "--porcelain", "-uall"], worktreeDir);
-  if (!statusResult.ok || !statusResult.stdout) return [];
+  if (!statusResult.ok || !statusResult.stdout) {return [];}
 
   // Per-file line counts: combine unstaged (working tree vs index) and staged (index vs HEAD)
   const lineMap = new Map<string, { added: number; removed: number }>();
@@ -131,10 +131,10 @@ export function getFileChanges(worktreeDir: string): FileChange[] {
     run(["git", "diff", "--numstat", "--cached"], worktreeDir), // staged
   ];
   for (const result of numstatCmds) {
-    if (!result.ok || !result.stdout) continue;
+    if (!result.ok || !result.stdout) {continue;}
     for (const line of result.stdout.split("\n")) {
       const parts = line.split("\t");
-      if (parts.length < 3) continue;
+      if (parts.length < 3) {continue;}
       const added = parseInt(parts[0]!, 10);
       const removed = parseInt(parts[1]!, 10);
       const path = parts[2]!;
@@ -148,7 +148,7 @@ export function getFileChanges(worktreeDir: string): FileChange[] {
   const changes: FileChange[] = [];
 
   for (const line of statusResult.stdout.split("\n")) {
-    if (line.length < 3) continue;
+    if (line.length < 3) {continue;}
     const x = line[0]!;
     const y = line[1]!;
     const rest = line.slice(3);
@@ -193,7 +193,7 @@ export function getFileChanges(worktreeDir: string): FileChange[] {
 
 export async function getDiffStatsAsync(worktreeDir: string): Promise<DiffStats> {
   const result = await runAsync(["git", "diff", "--shortstat", "HEAD"], worktreeDir);
-  if (!result.ok || !result.stdout) return { files: 0, added: 0, removed: 0 };
+  if (!result.ok || !result.stdout) {return { files: 0, added: 0, removed: 0 };}
 
   const summary = result.stdout;
   const files = parseInt(summary.match(/(\d+) file/)?.[1] ?? "0", 10);
@@ -205,13 +205,13 @@ export async function getDiffStatsAsync(worktreeDir: string): Promise<DiffStats>
 export async function getCurrentBranchAsync(worktreeDir: string): Promise<string | null> {
   const result = await runAsync(["git", "rev-parse", "--abbrev-ref", "HEAD"], worktreeDir);
   const branch = result.stdout;
-  if (!result.ok || !branch || branch === "HEAD") return null;
+  if (!result.ok || !branch || branch === "HEAD") {return null;}
   return branch;
 }
 
 export async function getFileChangesAsync(worktreeDir: string): Promise<FileChange[]> {
   const statusResult = await runRawAsync(["git", "status", "--porcelain", "-uall"], worktreeDir);
-  if (!statusResult.ok || !statusResult.stdout) return [];
+  if (!statusResult.ok || !statusResult.stdout) {return [];}
 
   // Run both numstat commands concurrently
   const [unstaged, staged] = await Promise.all([
@@ -221,10 +221,10 @@ export async function getFileChangesAsync(worktreeDir: string): Promise<FileChan
 
   const lineMap = new Map<string, { added: number; removed: number }>();
   for (const result of [unstaged, staged]) {
-    if (!result.ok || !result.stdout) continue;
+    if (!result.ok || !result.stdout) {continue;}
     for (const line of result.stdout.split("\n")) {
       const parts = line.split("\t");
-      if (parts.length < 3) continue;
+      if (parts.length < 3) {continue;}
       const added = parseInt(parts[0]!, 10);
       const removed = parseInt(parts[1]!, 10);
       const path = parts[2]!;
@@ -238,7 +238,7 @@ export async function getFileChangesAsync(worktreeDir: string): Promise<FileChan
   const changes: FileChange[] = [];
 
   for (const line of statusResult.stdout.split("\n")) {
-    if (line.length < 3) continue;
+    if (line.length < 3) {continue;}
     const x = line[0]!;
     const y = line[1]!;
     const rest = line.slice(3);
