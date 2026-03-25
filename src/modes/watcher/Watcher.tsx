@@ -373,9 +373,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
             const targetUrl = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
 
             // If already running, open directly
-            const url = result.alreadyRunning
-              ? targetUrl
-              : vsCodeLoaderUrl(targetUrl);
+            const url = result.alreadyRunning ? targetUrl : vsCodeLoaderUrl(targetUrl);
 
             // Open browser pane immediately (shows loading screen or VS Code)
             let surfaceId: string | null = null;
