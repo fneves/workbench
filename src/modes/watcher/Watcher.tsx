@@ -16,6 +16,26 @@ import {
 import { StatusBar } from "#modes/watcher/StatusBar";
 import { DiffStat } from "#modes/watcher/DiffStat";
 
+/** Build a data: URL loading page that polls the server and redirects when ready. */
+function vsCodeLoaderUrl(targetUrl: string): string {
+  const html = `<!DOCTYPE html>
+<html><head><style>
+body{background:#1e1e1e;color:#ccc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.wrap{text-align:center}
+.spinner{width:40px;height:40px;border:3px solid #333;border-top-color:#0078d4;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+p{font-size:14px;opacity:0.7}
+</style></head><body><div class="wrap">
+<div class="spinner"></div>
+<p>Starting VS Code\u2026</p>
+</div><script>
+const target=${JSON.stringify(targetUrl)};
+(async()=>{for(let i=0;i<60;i++){try{await fetch(target,{mode:'no-cors'});window.location.replace(target);return}catch(e){}await new Promise(r=>setTimeout(r,500))}
+document.querySelector('p').textContent='Server did not respond after 30 s';})();
+</script></body></html>`;
+  return `data:text/html;base64,${btoa(html)}`;
+}
+
 const REVIEW_OPTS = [
   { label: "accept", desc: "write review file + send to agent" },
   { label: "iterate", desc: "open interactive session to refine" },
@@ -332,16 +352,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       case "v":
         if (tools.code) {
           (async () => {
-            // Start code serve-web (idempotent)
-            const result = await request("vscode.start", { branch, worktree });
-            if (!result?.port) {
-              setAlert("VS Code server failed to start", "red");
-              return;
-            }
-
-            const url = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
-
-            // If we already have a browser surface, focus it
+            // If we already have a browser surface, just focus it
             if (vscodeSurfaceId.current) {
               const focused = await request("cmux.focusSurface", {
                 surfaceId: vscodeSurfaceId.current,
@@ -352,7 +363,21 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
               vscodeSurfaceId.current = null;
             }
 
-            // Open browser pane — reuse bottomPaneId if it exists
+            // Start code serve-web (idempotent) — get port immediately
+            const result = await request("vscode.start", { branch, worktree });
+            if (!result?.port) {
+              setAlert("VS Code server failed to start", "red");
+              return;
+            }
+
+            const targetUrl = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
+
+            // If already running, open directly
+            const url = result.alreadyRunning
+              ? targetUrl
+              : vsCodeLoaderUrl(targetUrl);
+
+            // Open browser pane immediately (shows loading screen or VS Code)
             let surfaceId: string | null = null;
             if (bottomPaneId.current) {
               try {

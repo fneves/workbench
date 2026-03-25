@@ -1,5 +1,5 @@
 import { resolve } from "path";
-import { writeFileSync, chmodSync, unlinkSync } from "fs";
+import { writeFileSync, chmodSync, unlinkSync, mkdirSync, existsSync } from "fs";
 import { listTasks, readState, updateState } from "#lib/state";
 import { getDiffStatsAsync, getFileChangesAsync } from "#lib/git";
 import { getConfig, getScriptDir, branchToSlug, getDefaultEditor } from "#lib/config";
@@ -355,6 +355,26 @@ export const handlers: Record<string, Handler> = {
     // Create a per-task server-data-dir to isolate extensions/state between tasks
     const slug = branchToSlug(branch);
     const serverDataDir = `/tmp/workbench/${slug}.vscode-data`;
+
+    // Pre-seed machine-level settings to auto-trust the workspace
+    const machineSettingsDir = resolve(serverDataDir, "data", "Machine");
+    if (!existsSync(machineSettingsDir)) {
+      mkdirSync(machineSettingsDir, { recursive: true });
+    }
+    const machineSettingsPath = resolve(machineSettingsDir, "settings.json");
+    if (!existsSync(machineSettingsPath)) {
+      writeFileSync(
+        machineSettingsPath,
+        JSON.stringify(
+          {
+            "security.workspace.trust.enabled": false,
+            "security.workspace.trust.startupPrompt": "never",
+          },
+          null,
+          2,
+        ),
+      );
+    }
 
     const proc = Bun.spawn(
       [
