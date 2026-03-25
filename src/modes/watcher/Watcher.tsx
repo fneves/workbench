@@ -16,7 +16,7 @@ import {
 import { StatusBar } from "#modes/watcher/StatusBar";
 import { DiffStat } from "#modes/watcher/DiffStat";
 
-/** Build a data: URL loading page that polls the server and redirects when ready. */
+/** Build a loader page (data URL) that polls the VS Code server and redirects when ready. */
 function vsCodeLoaderUrl(targetUrl: string): string {
   const html = `<!DOCTYPE html>
 <html><head><style>
@@ -408,6 +408,11 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
             vscodeSurfaceId.current = surfaceId;
             if (surfaceId) {
+              // Ensure this workspace is active, then focus the browser surface
+              const workspaceId = taskState?.cmux_workspace_id;
+              if (workspaceId) {
+                await request("cmux.selectWorkspace", { workspaceId });
+              }
               await request("cmux.focusSurface", { surfaceId });
             }
           })().catch((err) => {

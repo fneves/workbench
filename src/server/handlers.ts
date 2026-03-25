@@ -356,24 +356,24 @@ export const handlers: Record<string, Handler> = {
     const slug = branchToSlug(branch);
     const serverDataDir = `/tmp/workbench/${slug}.vscode-data`;
 
-    // Pre-seed machine-level settings to auto-trust the workspace
-    const machineSettingsDir = resolve(serverDataDir, "data", "Machine");
-    if (!existsSync(machineSettingsDir)) {
-      mkdirSync(machineSettingsDir, { recursive: true });
-    }
-    const machineSettingsPath = resolve(machineSettingsDir, "settings.json");
-    if (!existsSync(machineSettingsPath)) {
-      writeFileSync(
-        machineSettingsPath,
-        JSON.stringify(
-          {
-            "security.workspace.trust.enabled": false,
-            "security.workspace.trust.startupPrompt": "never",
-          },
-          null,
-          2,
-        ),
-      );
+    // Pre-seed settings to auto-trust workspaces — write to all paths the server may read
+    const trustSettings = JSON.stringify(
+      {
+        "security.workspace.trust.enabled": false,
+        "security.workspace.trust.startupPrompt": "never",
+      },
+      null,
+      2,
+    );
+    for (const subdir of ["data/Machine", "data/User"]) {
+      const dir = resolve(serverDataDir, subdir);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      const settingsPath = resolve(dir, "settings.json");
+      if (!existsSync(settingsPath)) {
+        writeFileSync(settingsPath, trustSettings);
+      }
     }
 
     const proc = Bun.spawn(
