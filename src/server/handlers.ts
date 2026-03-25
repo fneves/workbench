@@ -1,5 +1,5 @@
 import { resolve } from "path";
-import { writeFileSync, chmodSync, unlinkSync, mkdirSync, existsSync } from "fs";
+import { writeFileSync, chmodSync, unlinkSync } from "fs";
 import { listTasks, readState, updateState } from "#lib/state";
 import { getDiffStatsAsync, getFileChangesAsync } from "#lib/git";
 import { getConfig, getScriptDir, branchToSlug, getDefaultEditor } from "#lib/config";
@@ -172,7 +172,7 @@ export const handlers: Record<string, Handler> = {
   },
 
   "cmux.splitPaneWithIds": async (params) => {
-    const result = await splitPaneWithIds(params.direction ?? "down");
+    const result = await splitPaneWithIds(params.direction ?? "down", params.workspaceId);
     return result;
   },
 
@@ -352,26 +352,9 @@ export const handlers: Record<string, Handler> = {
       throw { code: "NO_FREE_PORT", message: "Could not find a free port for VS Code server" };
     }
 
-    // Create a per-task user-data-dir with workspace trust disabled
+    // Create a per-task server-data-dir to isolate extensions/state between tasks
     const slug = branchToSlug(branch);
-    const userDataDir = `/tmp/workbench/${slug}.vscode-data`;
-    const userSettingsDir = resolve(userDataDir, "User");
-    if (!existsSync(userSettingsDir)) {
-      mkdirSync(userSettingsDir, { recursive: true });
-    }
-    const settingsPath = resolve(userSettingsDir, "settings.json");
-    if (!existsSync(settingsPath)) {
-      writeFileSync(
-        settingsPath,
-        JSON.stringify(
-          {
-            "security.workspace.trust.enabled": false,
-          },
-          null,
-          2,
-        ),
-      );
-    }
+    const serverDataDir = `/tmp/workbench/${slug}.vscode-data`;
 
     const proc = Bun.spawn(
       [
@@ -383,23 +366,23 @@ export const handlers: Record<string, Handler> = {
         String(port),
         "--without-connection-token",
         "--accept-server-license-terms",
-        "--user-data-dir",
-        userDataDir,
+        "--server-data-dir",
+        serverDataDir,
       ],
       {
         cwd: worktree,
-        stdout: "pipe",
-        stderr: "pipe",
+        stdout: "ignore",
+        stderr: "ignore",
       },
     );
 
-    // Wait briefly to detect immediate startup failures
+    // Brief check — if the process crashes immediately, fail fast
     const exited = await Promise.race([
       proc.exited.then((code) => code),
       new Promise<null>((r) => setTimeout(() => r(null), 500)),
     ]);
     if (exited !== null && exited !== 0) {
-      throw { code: "VSCODE_START_FAILED", message: "code serve-web failed to start" };
+      throw { code: "VSCODE_START_FAILED", message: "code serve-web exited with code " + exited };
     }
 
     await updateState(branch, { vscode_pid: proc.pid, vscode_port: port });

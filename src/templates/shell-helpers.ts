@@ -7,11 +7,27 @@
 export function shellUpdateState(): string {
   return `update_state() {
     local key="$1" value="$2"
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg k "$key" --arg v "$value" \\
+    local lock="\${STATE_FILE}.lock.dir"
+    local tmp="\${STATE_FILE}.wb.\$\$.\${RANDOM}.part"
+    local i=0
+    until mkdir "\$lock" 2>/dev/null; do
+        sleep 0.05
+        i=\$((i + 1))
+        if [[ \$i -ge 400 ]]; then
+            return 1
+        fi
+    done
+    local ret=0
+    if jq --arg k "\$key" --arg v "\$value" \\
         '.[$k] = $v | .updated_at = (now | todate)' \\
-        "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+        "\$STATE_FILE" > "\$tmp"; then
+        cat "\$tmp" > "\$STATE_FILE" || ret=\$?
+    else
+        ret=\$?
+    fi
+    rm -f "\$tmp"
+    rmdir "\$lock" 2>/dev/null
+    return \$ret
 }`;
 }
 
@@ -19,18 +35,34 @@ export function shellUpdateState(): string {
 export function shellUpdateDiffStats(): string {
   return `update_diff_stats() {
     local summary
-    summary="$(cd "$WORKTREE_DIR" && git diff --shortstat HEAD 2>/dev/null || echo "")"
+    summary="\$(cd "\$WORKTREE_DIR" && git diff --shortstat HEAD 2>/dev/null || echo "")"
     local files=0 added=0 removed=0
-    if [[ -n "$summary" ]]; then
-        files=$(echo "$summary" | grep -oE '[0-9]+ file'       | grep -oE '[0-9]+' || echo 0)
-        added=$(echo "$summary" | grep -oE '[0-9]+ insertion'  | grep -oE '[0-9]+' || echo 0)
-        removed=$(echo "$summary" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
+    if [[ -n "\$summary" ]]; then
+        files=\$(echo "\$summary" | grep -oE '[0-9]+ file'       | grep -oE '[0-9]+' || echo 0)
+        added=\$(echo "\$summary" | grep -oE '[0-9]+ insertion'  | grep -oE '[0-9]+' || echo 0)
+        removed=\$(echo "\$summary" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
     fi
-    local tmp
-    tmp="$(mktemp)"
-    jq --argjson f "\${files:-0}" --argjson a "\${added:-0}" --argjson r "\${removed:-0}" \\
+    local lock="\${STATE_FILE}.lock.dir"
+    local tmp="\${STATE_FILE}.wb.\$\$.\${RANDOM}.part"
+    local i=0
+    until mkdir "\$lock" 2>/dev/null; do
+        sleep 0.05
+        i=\$((i + 1))
+        if [[ \$i -ge 400 ]]; then
+            return 1
+        fi
+    done
+    local ret=0
+    if jq --argjson f "\${files:-0}" --argjson a "\${added:-0}" --argjson r "\${removed:-0}" \\
         '.diff_files = $f | .diff_added = $a | .diff_removed = $r | .updated_at = (now | todate)' \\
-        "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+        "\$STATE_FILE" > "\$tmp"; then
+        cat "\$tmp" > "\$STATE_FILE" || ret=\$?
+    else
+        ret=\$?
+    fi
+    rm -f "\$tmp"
+    rmdir "\$lock" 2>/dev/null
+    return \$ret
 }`;
 }
 

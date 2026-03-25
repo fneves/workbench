@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync, chmodSync, existsSync } from "fs";
+import { platform } from "os";
 import {
   WORKBENCH_STATE_DIR,
   DEFAULT_AGENT,
@@ -223,10 +224,20 @@ export async function cmdSpawn(args: string[]): Promise<void> {
       return;
     }
 
-    const containerCmd = [
+    // devcontainers CLI only allocates a Docker PTY when *both* stdin and stdout are TTYs.
+    // Multiplexers (e.g. cmux) often leave stdin non-TTY → run `devcontainer exec` under host
+    // `script` so the CLI sees a real TTY. Do NOT wrap `claude` with `script` *inside* the
+    // container — nested PTYs break Ink after the workspace trust dialog (keyboard dies).
+    const termCols = process.stdout.columns ?? 120;
+    const termRows = process.stdout.rows ?? 40;
+    const innerCmd = [
       `devcontainer up --workspace-folder '${worktreeDir}' --config '${dcConfigPath}' --id-label 'workbench=${slug}'`,
-      `&& devcontainer exec --workspace-folder '${worktreeDir}' --config '${dcConfigPath}' --id-label 'workbench=${slug}' zsh /tmp/workbench/${slug}.run.sh`,
+      `&& devcontainer exec --workspace-folder '${worktreeDir}' --config '${dcConfigPath}' --id-label 'workbench=${slug}' --terminal-columns ${termCols} --terminal-rows ${termRows} -- zsh /tmp/workbench/${slug}.run.sh`,
     ].join(" ");
+    const containerCmd =
+      platform() === "darwin"
+        ? `script -q /dev/null sh -lc ${JSON.stringify(innerCmd)}`
+        : `script -qe -c ${JSON.stringify(innerCmd)} /dev/null`;
 
     if (!isInsideCmux()) {
       console.log(`${C.yellow}Not inside cmux.${C.nc}`);

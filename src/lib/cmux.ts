@@ -136,8 +136,13 @@ export async function splitPane(
 /** Split and return both surface and pane IDs. */
 export async function splitPaneWithIds(
   direction: "right" | "left" | "up" | "down" = "right",
+  workspaceId?: string,
 ): Promise<{ surfaceId: string; paneId: string } | null> {
-  const res = await cmuxRequest("surface.split", { direction });
+  const params: Record<string, any> = { direction };
+  if (workspaceId) {
+    params.workspace_id = workspaceId;
+  }
+  const res = await cmuxRequest("surface.split", params);
   if (!res?.ok) {
     return null;
   }

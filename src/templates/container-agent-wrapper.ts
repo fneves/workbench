@@ -3,8 +3,10 @@ import { shellUpdateState, shellUpdateDiffStats, shellDiffPoller } from "#templa
 
 /**
  * Shell script to run Claude Code / OpenCode inside a devcontainer.
- * Headless mode uses `claude -p` (non-interactive). Interactive mode matches host
- * worktree behavior: TTY session, then `exec zsh` so you stay in the worktree.
+ * Headless mode uses `claude -p` (non-interactive). Interactive mode uses
+ * `--dangerously-skip-permissions` so the workspace trust TUI is skipped (it breaks
+ * under some Docker/PTY stacks); devcontainers are already an isolation boundary.
+ * Then `exec zsh` so you stay in the worktree.
  *
  * State under /tmp/workbench is bind-mounted from the host; repo edits are the same
  * worktree bind-mount, so the host and container stay in sync.
@@ -25,7 +27,7 @@ export function generateContainerAgentWrapper(opts: {
       return "opencode";
     }
     if (opts.interactive || !opts.prompt) {
-      return "claude";
+      return "claude --dangerously-skip-permissions";
     }
     return `claude -p '${escaped}' --dangerously-skip-permissions`;
   })();

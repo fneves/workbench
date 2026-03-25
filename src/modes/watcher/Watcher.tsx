@@ -72,6 +72,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
   const openInBottomPane = useCallback(
     async (cmd: string) => {
       let surfaceId: string | null = null;
+      const workspaceId = taskState?.cmux_workspace_id ?? undefined;
 
       if (bottomPaneId.current) {
         try {
@@ -86,7 +87,10 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
       if (!surfaceId) {
         try {
-          const result = await request("cmux.splitPaneWithIds", { direction: "down" });
+          const result = await request("cmux.splitPaneWithIds", {
+            direction: "down",
+            workspaceId,
+          });
           if (!result) {
             return;
           }
@@ -101,7 +105,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       await request("cmux.focusSurface", { surfaceId });
       await request("cmux.sendText", { text: `${cmd}; exit\n`, surfaceId });
     },
-    [request],
+    [request, taskState?.cmux_workspace_id],
   );
 
   /** Open the review file in the bottom pane for reading. */
@@ -331,23 +335,11 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
             // Start code serve-web (idempotent)
             const result = await request("vscode.start", { branch, worktree });
             if (!result?.port) {
+              setAlert("VS Code server failed to start", "red");
               return;
             }
 
             const url = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
-
-            // Wait for server to be ready if freshly started
-            if (!result.alreadyRunning) {
-              for (let i = 0; i < 20; i++) {
-                try {
-                  const res = await fetch(`http://127.0.0.1:${result.port}`);
-                  if (res.ok || res.status === 302) {
-                    break;
-                  }
-                } catch {}
-                await new Promise((r) => setTimeout(r, 250));
-              }
-            }
 
             // If we already have a browser surface, focus it
             if (vscodeSurfaceId.current) {
@@ -375,8 +367,14 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
             }
 
             if (!surfaceId) {
-              const r = await request("cmux.splitBrowserPane", { url, direction: "down" });
+              const workspaceId = taskState?.cmux_workspace_id ?? undefined;
+              const r = await request("cmux.splitBrowserPane", {
+                url,
+                direction: "down",
+                workspaceId,
+              });
               if (!r) {
+                setAlert("Failed to create browser pane", "red");
                 return;
               }
               surfaceId = r.surfaceId;
@@ -387,7 +385,9 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
             if (surfaceId) {
               await request("cmux.focusSurface", { surfaceId });
             }
-          })();
+          })().catch((err) => {
+            setAlert(`VS Code error: ${err?.message ?? err}`, "red");
+          });
         }
         break;
       case "q":
