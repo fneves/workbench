@@ -64,6 +64,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
 
   // Track the bottom pane so subsequent shortcuts open new tabs instead of new panes
   const bottomPaneId = useRef<string | null>(null);
+  const vscodeSurfaceId = useRef<string | null>(null);
 
   /** Open a command in the bottom pane, creating it if needed. Surface closes when command exits. */
   const openInBottomPane = useCallback(
@@ -306,6 +307,48 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       case "x":
         openInBottomPane(`cd '${worktree}' && ./scripts/start.sh`);
         break;
+      case "v":
+        if (tools.code) {
+          (async () => {
+            // Start code serve-web (idempotent)
+            const result = await request("vscode.start", { branch, worktree });
+            if (!result?.port) {return;}
+
+            const url = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
+
+            // If we already have a browser surface, focus it
+            if (vscodeSurfaceId.current) {
+              const focused = await request("cmux.focusSurface", { surfaceId: vscodeSurfaceId.current });
+              if (focused?.ok) {return;}
+              vscodeSurfaceId.current = null;
+            }
+
+            // Open browser pane — reuse bottomPaneId if it exists
+            let surfaceId: string | null = null;
+            if (bottomPaneId.current) {
+              try {
+                const r = await request("cmux.createBrowserSurfaceInPane", {
+                  paneId: bottomPaneId.current,
+                  url,
+                });
+                surfaceId = r?.surfaceId ?? null;
+              } catch {
+                bottomPaneId.current = null;
+              }
+            }
+
+            if (!surfaceId) {
+              const r = await request("cmux.splitBrowserPane", { url, direction: "down" });
+              if (!r) {return;}
+              surfaceId = r.surfaceId;
+              bottomPaneId.current = r.paneId;
+            }
+
+            vscodeSurfaceId.current = surfaceId;
+            if (surfaceId) {await request("cmux.focusSurface", { surfaceId });}
+          })();
+        }
+        break;
       case "q":
         exitTui(0);
     }
@@ -451,6 +494,13 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           <span fg="#06b6d4">t</span>
           {" terminal"}
         </text>
+        {tools.code && (
+          <text style={{ width: 20 }}>
+            {"  "}
+            <span fg="#06b6d4">v</span>
+            {" vscode"}
+          </text>
+        )}
       </box>
       {tools.claude && (
         <box style={{ flexDirection: "row", gap: 0 }}>

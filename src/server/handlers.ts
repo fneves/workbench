@@ -16,7 +16,10 @@ import {
   newWorkspace,
   closeWorkspace,
   cmuxNotify,
+  splitBrowserPane,
+  createBrowserSurfaceInPane,
 } from "#lib/cmux";
+import { isProcessAlive } from "#lib/process";
 import { generatePrCreatorScript } from "#templates/pr-creator";
 
 type Handler = (params: Record<string, any>) => Promise<any>;
@@ -306,18 +309,85 @@ export const handlers: Record<string, Handler> = {
     return { editor: getDefaultEditor() };
   },
 
+  // --- VS Code ---
+
+  "vscode.start": async (params) => {
+    const { branch, worktree } = params;
+    if (!branch || !worktree) {
+      throw { code: "MISSING_PARAMS", message: "branch and worktree are required" };
+    }
+    const state = await readState(branch);
+
+    // Already running?
+    if (state?.vscode_pid && isProcessAlive(state.vscode_pid) && state.vscode_port) {
+      return { port: state.vscode_port, pid: state.vscode_pid, alreadyRunning: true };
+    }
+
+    // Derive port from branch name hash
+    let hash = 0;
+    for (const ch of branch) {hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0;}
+    let port = 9100 + (Math.abs(hash) % 900);
+
+    // Check port is free, increment if not (up to 10 tries)
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const testProc = Bun.spawn(["lsof", "-i", `:${port}`, "-t"], {
+        stdout: "pipe",
+        stderr: "ignore",
+      });
+      const output = await new Response(testProc.stdout).text();
+      await testProc.exited;
+      if (!output.trim()) {break;}
+      port++;
+    }
+
+    const proc = Bun.spawn([
+      "code", "serve-web",
+      "--host", "127.0.0.1",
+      "--port", String(port),
+      "--without-connection-token",
+      "--accept-server-license-terms",
+    ], {
+      cwd: worktree,
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+
+    await updateState(branch, { vscode_pid: proc.pid, vscode_port: port });
+
+    return { port, pid: proc.pid, alreadyRunning: false };
+  },
+
+  // --- cmux browser panes ---
+
+  "cmux.splitBrowserPane": async (params) => {
+    const result = await splitBrowserPane(
+      params.url,
+      params.direction ?? "down",
+      params.workspaceId,
+    );
+    return result;
+  },
+
+  "cmux.createBrowserSurfaceInPane": async (params) => {
+    const surfaceId = await createBrowserSurfaceInPane(params.paneId, params.url);
+    return { surfaceId };
+  },
+
+  // --- Config ---
+
   "config.tools": async () => {
     const check = async (cmd: string) => {
       const proc = Bun.spawn(["which", cmd], { stdout: "ignore", stderr: "ignore" });
       return (await proc.exited) === 0;
     };
-    const [fzf, lazygit, delta, bat, gh] = await Promise.all([
+    const [fzf, lazygit, delta, bat, gh, code] = await Promise.all([
       check("fzf"),
       check("lazygit"),
       check("delta"),
       check("bat"),
       check("gh"),
+      check("code"),
     ]);
-    return { fzf, lazygit, delta, bat, claude: Bun.which("claude") !== null, gh };
+    return { fzf, lazygit, delta, bat, claude: Bun.which("claude") !== null, gh, code };
   },
 };

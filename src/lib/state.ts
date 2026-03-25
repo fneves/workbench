@@ -26,6 +26,8 @@ export interface TaskState {
   cmux_agent_surface_id: string | null;
   container_id: string | null;
   devcontainer_config: string | null;
+  vscode_pid: number | null;
+  vscode_port: number | null;
 }
 
 export async function readState(branch: string): Promise<TaskState | null> {
@@ -99,6 +101,8 @@ export function newTaskState(opts: {
     cmux_agent_surface_id: null,
     container_id: null,
     devcontainer_config: null,
+    vscode_pid: null,
+    vscode_port: null,
   };
 }
 
@@ -169,6 +173,8 @@ export async function reconcileWorktrees(): Promise<void> {
         cmux_agent_surface_id: null,
         container_id: null,
         devcontainer_config: null,
+        vscode_pid: null,
+        vscode_port: null,
       };
       await writeState(actualBranch, state);
     }

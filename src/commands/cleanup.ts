@@ -26,6 +26,12 @@ export async function doCleanupTask(branch: string): Promise<void> {
     killProcess(state.pid);
   }
 
+  // Kill VS Code server if running
+  if (state?.vscode_pid && isProcessAlive(state.vscode_pid)) {
+    console.log(`  ${C.dim}Killing VS Code server (PID ${state.vscode_pid})${C.nc}`);
+    killProcess(state.vscode_pid);
+  }
+
   // Stop container if this was a container task
   if (state?.mode === "container") {
     const slug = branchToSlug(branch);

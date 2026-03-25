@@ -164,6 +164,54 @@ export async function sendKey(key: string, surfaceId?: string): Promise<boolean>
   return res?.ok ?? false;
 }
 
+// --- Browser panes ---
+
+const CMUX_CLI =
+  process.env.CMUX_CLI_PATH ?? "/Applications/cmux.app/Contents/Resources/bin/cmux";
+
+/** Run a cmux CLI command and return parsed JSON output. */
+async function cmuxCli(args: string[]): Promise<Record<string, any> | null> {
+  const proc = Bun.spawn([CMUX_CLI, "--json", ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const stdout = await new Response(proc.stdout).text();
+  const code = await proc.exited;
+  if (code !== 0) {return null;}
+  try {
+    return JSON.parse(stdout.trim());
+  } catch {
+    return { raw: stdout.trim() };
+  }
+}
+
+/** Split and create a browser surface showing the given URL. */
+export async function splitBrowserPane(
+  url: string,
+  direction: "right" | "left" | "up" | "down" = "down",
+  workspaceId?: string,
+): Promise<{ surfaceId: string; paneId: string } | null> {
+  const args = ["new-pane", "--type", "browser", "--direction", direction, "--url", url];
+  if (workspaceId) {args.push("--workspace", workspaceId);}
+  const result = await cmuxCli(args);
+  if (!result) {return null;}
+  return {
+    surfaceId: result.surface_id ?? result.raw ?? "",
+    paneId: result.pane_id ?? result.raw ?? "",
+  };
+}
+
+/** Create a browser tab (surface) inside an existing pane. */
+export async function createBrowserSurfaceInPane(
+  paneId: string,
+  url: string,
+): Promise<string | null> {
+  const args = ["new-surface", "--type", "browser", "--pane", paneId, "--url", url];
+  const result = await cmuxCli(args);
+  if (!result) {return null;}
+  return result.surface_id ?? result.raw ?? null;
+}
+
 // --- Notifications ---
 
 export async function cmuxNotify(title: string, body: string): Promise<boolean> {
