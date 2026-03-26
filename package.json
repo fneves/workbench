@@ -15,7 +15,8 @@
     "#modes/watcher/*": "./src/modes/watcher/*.tsx"
   },
   "scripts": {
-    "dev": "bun run src/index.tsx",
+    "dev": "WB=~/.local/bin/workbench; [ -f \"$WB\" ] && [ ! -L \"$WB\" ] && mv \"$WB\" \"$WB.stable\"; ln -sf \"$(pwd)/dev.sh\" \"$WB\" && echo 'Dev mode active — workbench runs from source'",
+    "stable": "WB=~/.local/bin/workbench; if [ -f \"$WB.stable\" ]; then mv \"$WB.stable\" \"$WB\" && echo 'Stable mode restored'; elif [ -d dist ] && [ -f dist/workbench ]; then ln -sf \"$(pwd)/dist/workbench\" \"$WB\" && echo 'Linked to compiled binary'; else echo 'No stable backup or dist/workbench found — run bun run build first'; fi",
     "typecheck": "tsc --noEmit",
     "lint": "find src \\( -name '*.ts' -o -name '*.tsx' \\) -print0 | xargs -0 bunx oxlint",
     "lint:fix": "find src \\( -name '*.ts' -o -name '*.tsx' \\) -print0 | xargs -0 bunx oxlint --fix",
