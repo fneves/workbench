@@ -255,6 +255,16 @@ export async function createBrowserSurfaceInPane(
   paneId: string,
   url: string,
 ): Promise<string | null> {
+  // Try socket API first (handles UUID pane IDs from surface.split)
+  const res = await cmuxRequest("surface.create", {
+    pane_id: paneId,
+    type: "browser",
+    url,
+  });
+  if (res?.ok && res.result?.surface_id) {
+    return res.result.surface_id;
+  }
+  // Fall back to CLI (handles pane:NNN ref format)
   const args = ["new-surface", "--type", "browser", "--pane", paneId, "--url", url];
   const result = await cmuxCli(args);
   if (!result) {

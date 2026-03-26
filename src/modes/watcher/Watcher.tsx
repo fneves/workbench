@@ -403,7 +403,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
               // If already running, open directly
               const url = result.alreadyRunning ? targetUrl : vsCodeLoaderUrl(targetUrl);
 
-              // Open browser pane immediately (shows loading screen or VS Code)
+              // Try to add browser tab in existing bottom pane, fall back to new split
               let surfaceId: string | null = null;
               if (bottomPaneId.current) {
                 try {
@@ -413,6 +413,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
                   });
                   surfaceId = r?.surfaceId ?? null;
                 } catch {
+                  // Pane no longer exists — clear and fall through to split
                   bottomPaneId.current = null;
                 }
               }
