@@ -373,12 +373,6 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
           vsCodeOpening.current = true;
           (async () => {
             try {
-              vlog(`--- v pressed --- branch=${branch}`);
-              vlog(`  ref surfaceId=${vscodeSurfaceId.current}`);
-              vlog(`  state surfaceId=${taskState?.vscode_surface_id ?? "null"}`);
-              vlog(`  state workspaceId=${myWorkspaceId ?? "null"}`);
-              vlog(`  bottomPaneId=${bottomPaneId.current}`);
-
               // If we already have a browser surface, select workspace and focus it
               if (vscodeSurfaceId.current) {
                 const workspaceId = myWorkspaceId;
@@ -388,17 +382,17 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
                 const focused = await request("cmux.focusSurface", {
                   surfaceId: vscodeSurfaceId.current,
                 });
-                vlog(`  focusSurface result: ${JSON.stringify(focused)}`);
                 if (focused?.ok) {
+                  vlog(`vscode focus ok surface=${vscodeSurfaceId.current}`);
                   return;
                 }
+                vlog(`vscode focus failed surface=${vscodeSurfaceId.current}, reopening`);
                 vscodeSurfaceId.current = null;
                 request("task.update", { branch, vscode_surface_id: null }).catch(() => {});
               }
 
               // Start code serve-web (idempotent) — get port immediately
               const result = await request("vscode.start", { branch, worktree });
-              vlog(`  vscode.start result: ${JSON.stringify(result)}`);
               if (!result?.port) {
                 setAlert("VS Code server failed to start", "red");
                 return;
@@ -418,22 +412,18 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
                     url,
                   });
                   surfaceId = r?.surfaceId ?? null;
-                  vlog(`  createBrowserSurfaceInPane: surfaceId=${surfaceId}`);
-                } catch (err: any) {
-                  vlog(`  createBrowserSurfaceInPane failed: ${err?.message}`);
+                } catch {
                   bottomPaneId.current = null;
                 }
               }
 
               if (!surfaceId) {
                 const workspaceId = myWorkspaceId ?? undefined;
-                vlog(`  splitBrowserPane workspaceId=${workspaceId ?? "DEFAULT"}`);
                 const r = await request("cmux.splitBrowserPane", {
                   url,
                   direction: "down",
                   workspaceId,
                 });
-                vlog(`  splitBrowserPane result: ${JSON.stringify(r)}`);
                 if (!r) {
                   setAlert("Failed to create browser pane", "red");
                   return;
@@ -443,12 +433,12 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
               }
 
               vscodeSurfaceId.current = surfaceId;
-              vlog(`  final surfaceId=${surfaceId}`);
+              vlog(`vscode opened surface=${surfaceId} port=${result.port} workspace=${myWorkspaceId ?? "none"}`);
               if (surfaceId) {
                 // Persist surface ID so it survives watcher restarts
-                request("task.update", { branch, vscode_surface_id: surfaceId })
-                  .then(() => vlog(`  task.update succeeded`))
-                  .catch((err) => vlog(`  task.update FAILED: ${err?.message ?? err}`));
+                request("task.update", { branch, vscode_surface_id: surfaceId }).catch((err) =>
+                  vlog(`task.update failed: ${err?.message ?? err}`),
+                );
                 // Ensure this workspace is active, then focus the browser surface
                 const workspaceId = myWorkspaceId;
                 if (workspaceId) {
