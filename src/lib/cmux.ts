@@ -209,13 +209,25 @@ async function cmuxCli(args: string[]): Promise<Record<string, any> | null> {
   const stdout = await new Response(proc.stdout).text();
   const code = await proc.exited;
   if (code !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    debugLog(`cmuxCli FAILED: args=${JSON.stringify(args)} code=${code} stderr=${stderr}`);
     return null;
   }
   try {
-    return JSON.parse(stdout.trim());
+    const parsed = JSON.parse(stdout.trim());
+    debugLog(`cmuxCli OK: args=${JSON.stringify(args)} result=${JSON.stringify(parsed)}`);
+    return parsed;
   } catch {
+    debugLog(`cmuxCli RAW: args=${JSON.stringify(args)} stdout=${stdout.trim()}`);
     return { raw: stdout.trim() };
   }
+}
+
+function debugLog(msg: string) {
+  try {
+    const { appendFileSync } = require("fs");
+    appendFileSync("/tmp/workbench/vscode-debug.log", `[${new Date().toISOString()}] [cmux] ${msg}\n`);
+  } catch {}
 }
 
 /** Split and create a browser surface showing the given URL. */
@@ -233,8 +245,8 @@ export async function splitBrowserPane(
     return null;
   }
   return {
-    surfaceId: result.surface_id ?? result.raw ?? "",
-    paneId: result.pane_id ?? result.raw ?? "",
+    surfaceId: result.surface_ref ?? result.surface_id ?? result.raw ?? "",
+    paneId: result.pane_ref ?? result.pane_id ?? result.raw ?? "",
   };
 }
 
@@ -248,7 +260,7 @@ export async function createBrowserSurfaceInPane(
   if (!result) {
     return null;
   }
-  return result.surface_id ?? result.raw ?? null;
+  return result.surface_ref ?? result.surface_id ?? result.raw ?? null;
 }
 
 // --- Notifications ---

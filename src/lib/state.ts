@@ -28,6 +28,7 @@ export interface TaskState {
   devcontainer_config: string | null;
   vscode_pid: number | null;
   vscode_port: number | null;
+  vscode_surface_id: string | null;
 }
 
 export async function readState(branch: string): Promise<TaskState | null> {
@@ -103,6 +104,7 @@ export function newTaskState(opts: {
     devcontainer_config: null,
     vscode_pid: null,
     vscode_port: null,
+    vscode_surface_id: null,
   };
 }
 
@@ -175,6 +177,7 @@ export async function reconcileWorktrees(): Promise<void> {
         devcontainer_config: null,
         vscode_pid: null,
         vscode_port: null,
+        vscode_surface_id: null,
       };
       await writeState(actualBranch, state);
     }
@@ -197,6 +200,7 @@ export async function reconcileWorktrees(): Promise<void> {
     if (task.vscode_pid && !isProcessAlive(task.vscode_pid)) {
       updates.vscode_pid = null;
       updates.vscode_port = null;
+      updates.vscode_surface_id = null;
     }
 
     // Refresh diff stats if the worktree still exists

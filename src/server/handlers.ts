@@ -326,7 +326,7 @@ export const handlers: Record<string, Handler> = {
     // Clean up stale state: PID is dead but orphaned children may still hold the port
     if (state?.vscode_pid && !isProcessAlive(state.vscode_pid) && state.vscode_port) {
       await killPortOccupants(state.vscode_port);
-      await updateState(branch, { vscode_pid: null, vscode_port: null });
+      await updateState(branch, { vscode_pid: null, vscode_port: null, vscode_surface_id: null });
     }
 
     // Derive port from branch name hash
@@ -435,7 +435,7 @@ export const handlers: Record<string, Handler> = {
     if (state?.vscode_port) {
       await killPortOccupants(state.vscode_port);
     }
-    await updateState(branch, { vscode_pid: null, vscode_port: null });
+    await updateState(branch, { vscode_pid: null, vscode_port: null, vscode_surface_id: null });
     return { stopped: true };
   },
 

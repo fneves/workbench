@@ -15,6 +15,12 @@ import {
 
 import { StatusBar } from "#modes/watcher/StatusBar";
 import { DiffStat } from "#modes/watcher/DiffStat";
+import { appendFileSync } from "fs";
+
+const VSCODE_LOG = "/tmp/workbench/vscode-debug.log";
+function vlog(msg: string) {
+  appendFileSync(VSCODE_LOG, `[${new Date().toISOString()}] ${msg}\n`);
+}
 
 /** Build a loader page (data URL) that polls the VS Code server and redirects when ready. */
 function vsCodeLoaderUrl(targetUrl: string): string {
@@ -42,6 +48,10 @@ const REVIEW_OPTS = [
   { label: "reject", desc: "discard review" },
 ];
 
+// The watcher runs inside the task's cmux workspace — capture it from env
+// since taskState.cmux_workspace_id may be null for orphan/reconciled tasks.
+const LOCAL_WORKSPACE_ID = process.env.CMUX_WORKSPACE_ID ?? null;
+
 function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) {
   const { height, width } = useTerminalDimensions();
   const client = useWorkbenchClient();
@@ -50,6 +60,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
   const files = useFileChanges(branch);
   const status = taskState?.status ?? "unknown";
   const lastStatus = useRef("");
+  const myWorkspaceId = taskState?.cmux_workspace_id ?? LOCAL_WORKSPACE_ID;
 
   const [showReviewActions, setShowReviewActions] = useState(false);
   const [reviewActionIdx, setReviewActionIdx] = useState(0);
@@ -87,12 +98,20 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
   // Track the bottom pane so subsequent shortcuts open new tabs instead of new panes
   const bottomPaneId = useRef<string | null>(null);
   const vscodeSurfaceId = useRef<string | null>(null);
+  const vsCodeOpening = useRef(false);
+
+  // Restore persisted vscode surface ID from task state
+  useEffect(() => {
+    if (!vscodeSurfaceId.current && taskState?.vscode_surface_id) {
+      vscodeSurfaceId.current = taskState.vscode_surface_id;
+    }
+  }, [taskState?.vscode_surface_id]);
 
   /** Open a command in the bottom pane, creating it if needed. Surface closes when command exits. */
   const openInBottomPane = useCallback(
     async (cmd: string) => {
       let surfaceId: string | null = null;
-      const workspaceId = taskState?.cmux_workspace_id ?? undefined;
+      const workspaceId = myWorkspaceId ?? undefined;
 
       if (bottomPaneId.current) {
         try {
@@ -125,7 +144,7 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
       await request("cmux.focusSurface", { surfaceId });
       await request("cmux.sendText", { text: `${cmd}; exit\n`, surfaceId });
     },
-    [request, taskState?.cmux_workspace_id],
+    [request, myWorkspaceId],
   );
 
   /** Open the review file in the bottom pane for reading. */
@@ -350,70 +369,98 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
         openInBottomPane(`cd '${worktree}' && ./scripts/start.sh`);
         break;
       case "v":
-        if (tools.code) {
+        if (tools.code && !vsCodeOpening.current) {
+          vsCodeOpening.current = true;
           (async () => {
-            // If we already have a browser surface, just focus it
-            if (vscodeSurfaceId.current) {
-              const focused = await request("cmux.focusSurface", {
-                surfaceId: vscodeSurfaceId.current,
-              });
-              if (focused?.ok) {
-                return;
-              }
-              vscodeSurfaceId.current = null;
-            }
+            try {
+              vlog(`--- v pressed --- branch=${branch}`);
+              vlog(`  ref surfaceId=${vscodeSurfaceId.current}`);
+              vlog(`  state surfaceId=${taskState?.vscode_surface_id ?? "null"}`);
+              vlog(`  state workspaceId=${myWorkspaceId ?? "null"}`);
+              vlog(`  bottomPaneId=${bottomPaneId.current}`);
 
-            // Start code serve-web (idempotent) — get port immediately
-            const result = await request("vscode.start", { branch, worktree });
-            if (!result?.port) {
-              setAlert("VS Code server failed to start", "red");
-              return;
-            }
-
-            const targetUrl = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
-
-            // If already running, open directly
-            const url = result.alreadyRunning ? targetUrl : vsCodeLoaderUrl(targetUrl);
-
-            // Open browser pane immediately (shows loading screen or VS Code)
-            let surfaceId: string | null = null;
-            if (bottomPaneId.current) {
-              try {
-                const r = await request("cmux.createBrowserSurfaceInPane", {
-                  paneId: bottomPaneId.current,
-                  url,
+              // If we already have a browser surface, select workspace and focus it
+              if (vscodeSurfaceId.current) {
+                const workspaceId = myWorkspaceId;
+                if (workspaceId) {
+                  await request("cmux.selectWorkspace", { workspaceId });
+                }
+                const focused = await request("cmux.focusSurface", {
+                  surfaceId: vscodeSurfaceId.current,
                 });
-                surfaceId = r?.surfaceId ?? null;
-              } catch {
-                bottomPaneId.current = null;
+                vlog(`  focusSurface result: ${JSON.stringify(focused)}`);
+                if (focused?.ok) {
+                  return;
+                }
+                vscodeSurfaceId.current = null;
+                request("task.update", { branch, vscode_surface_id: null }).catch(() => {});
               }
-            }
 
-            if (!surfaceId) {
-              const workspaceId = taskState?.cmux_workspace_id ?? undefined;
-              const r = await request("cmux.splitBrowserPane", {
-                url,
-                direction: "down",
-                workspaceId,
-              });
-              if (!r) {
-                setAlert("Failed to create browser pane", "red");
+              // Start code serve-web (idempotent) — get port immediately
+              const result = await request("vscode.start", { branch, worktree });
+              vlog(`  vscode.start result: ${JSON.stringify(result)}`);
+              if (!result?.port) {
+                setAlert("VS Code server failed to start", "red");
                 return;
               }
-              surfaceId = r.surfaceId;
-              bottomPaneId.current = r.paneId;
-            }
 
-            vscodeSurfaceId.current = surfaceId;
-            if (surfaceId) {
-              // Ensure this workspace is active, then focus the browser surface
-              const workspaceId = taskState?.cmux_workspace_id;
-              if (workspaceId) {
-                await request("cmux.selectWorkspace", { workspaceId });
+              const targetUrl = `http://127.0.0.1:${result.port}?folder=${encodeURIComponent(worktree)}`;
+
+              // If already running, open directly
+              const url = result.alreadyRunning ? targetUrl : vsCodeLoaderUrl(targetUrl);
+
+              // Open browser pane immediately (shows loading screen or VS Code)
+              let surfaceId: string | null = null;
+              if (bottomPaneId.current) {
+                try {
+                  const r = await request("cmux.createBrowserSurfaceInPane", {
+                    paneId: bottomPaneId.current,
+                    url,
+                  });
+                  surfaceId = r?.surfaceId ?? null;
+                  vlog(`  createBrowserSurfaceInPane: surfaceId=${surfaceId}`);
+                } catch (err: any) {
+                  vlog(`  createBrowserSurfaceInPane failed: ${err?.message}`);
+                  bottomPaneId.current = null;
+                }
               }
-              await request("cmux.focusSurface", { surfaceId });
+
+              if (!surfaceId) {
+                const workspaceId = myWorkspaceId ?? undefined;
+                vlog(`  splitBrowserPane workspaceId=${workspaceId ?? "DEFAULT"}`);
+                const r = await request("cmux.splitBrowserPane", {
+                  url,
+                  direction: "down",
+                  workspaceId,
+                });
+                vlog(`  splitBrowserPane result: ${JSON.stringify(r)}`);
+                if (!r) {
+                  setAlert("Failed to create browser pane", "red");
+                  return;
+                }
+                surfaceId = r.surfaceId;
+                bottomPaneId.current = r.paneId;
+              }
+
+              vscodeSurfaceId.current = surfaceId;
+              vlog(`  final surfaceId=${surfaceId}`);
+              if (surfaceId) {
+                // Persist surface ID so it survives watcher restarts
+                request("task.update", { branch, vscode_surface_id: surfaceId })
+                  .then(() => vlog(`  task.update succeeded`))
+                  .catch((err) => vlog(`  task.update FAILED: ${err?.message ?? err}`));
+                // Ensure this workspace is active, then focus the browser surface
+                const workspaceId = myWorkspaceId;
+                if (workspaceId) {
+                  await request("cmux.selectWorkspace", { workspaceId });
+                }
+                await request("cmux.focusSurface", { surfaceId });
+              }
+            } finally {
+              vsCodeOpening.current = false;
             }
           })().catch((err) => {
+            vsCodeOpening.current = false;
             setAlert(`VS Code error: ${err?.message ?? err}`, "red");
           });
         }
