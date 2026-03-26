@@ -2,7 +2,7 @@ import { existsSync, rmSync, unlinkSync } from "fs";
 import { WORKBENCH_STATE_DIR, getStateFile, branchToSlug } from "#lib/config";
 import { readState, listTasks } from "#lib/state";
 import { removeWorktree } from "#lib/git";
-import { killProcess, isProcessAlive } from "#lib/process";
+import { killProcessTree, killPortOccupants, isProcessAlive } from "#lib/process";
 import { listWorkspaces, closeWorkspace, currentWorkspaceId } from "#lib/cmux";
 import { stopContainer, cleanupAllContainers } from "#lib/container";
 
@@ -20,16 +20,20 @@ export async function doCleanupTask(branch: string): Promise<void> {
 
   const state = await readState(branch);
 
-  // Kill agent process if running
+  // Kill agent process and its children
   if (state?.pid && isProcessAlive(state.pid)) {
-    console.log(`  ${C.dim}Killing agent (PID ${state.pid})${C.nc}`);
-    killProcess(state.pid);
+    console.log(`  ${C.dim}Killing agent tree (PID ${state.pid})${C.nc}`);
+    await killProcessTree(state.pid);
   }
 
-  // Kill VS Code server if running
+  // Kill VS Code server and all its child processes
   if (state?.vscode_pid && isProcessAlive(state.vscode_pid)) {
-    console.log(`  ${C.dim}Killing VS Code server (PID ${state.vscode_pid})${C.nc}`);
-    killProcess(state.vscode_pid);
+    console.log(`  ${C.dim}Killing VS Code server tree (PID ${state.vscode_pid})${C.nc}`);
+    await killProcessTree(state.vscode_pid);
+  }
+  // Kill any orphaned processes still holding the vscode port
+  if (state?.vscode_port) {
+    await killPortOccupants(state.vscode_port);
   }
 
   // Stop container if this was a container task

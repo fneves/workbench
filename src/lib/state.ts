@@ -193,6 +193,12 @@ export async function reconcileWorktrees(): Promise<void> {
       }
     }
 
+    // If vscode PID is set but process is dead, clear it and its port
+    if (task.vscode_pid && !isProcessAlive(task.vscode_pid)) {
+      updates.vscode_pid = null;
+      updates.vscode_port = null;
+    }
+
     // Refresh diff stats if the worktree still exists
     if (task.worktree && existsSync(task.worktree)) {
       const diff = await getDiffStatsAsync(task.worktree);

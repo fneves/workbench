@@ -19,7 +19,7 @@ import {
   splitBrowserPane,
   createBrowserSurfaceInPane,
 } from "#lib/cmux";
-import { isProcessAlive } from "#lib/process";
+import { isProcessAlive, killProcessTree, killPortOccupants, isPortFree } from "#lib/process";
 import { generatePrCreatorScript } from "#templates/pr-creator";
 
 type Handler = (params: Record<string, any>) => Promise<any>;
@@ -323,6 +323,12 @@ export const handlers: Record<string, Handler> = {
       return { port: state.vscode_port, pid: state.vscode_pid, alreadyRunning: true };
     }
 
+    // Clean up stale state: PID is dead but orphaned children may still hold the port
+    if (state?.vscode_pid && !isProcessAlive(state.vscode_pid) && state.vscode_port) {
+      await killPortOccupants(state.vscode_port);
+      await updateState(branch, { vscode_pid: null, vscode_port: null });
+    }
+
     // Derive port from branch name hash
     let hash = 0;
     for (const ch of branch) {
@@ -330,16 +336,10 @@ export const handlers: Record<string, Handler> = {
     }
     let port = 9100 + (Math.abs(hash) % 900);
 
-    // Check port is free, increment if not (up to 10 tries)
+    // Find a free port using actual bind test (race-free)
     let portFound = false;
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const testProc = Bun.spawn(["lsof", "-i", `:${port}`, "-t"], {
-        stdout: "pipe",
-        stderr: "ignore",
-      });
-      const output = await new Response(testProc.stdout).text();
-      await testProc.exited;
-      if (!output.trim()) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      if (await isPortFree(port)) {
         portFound = true;
         break;
       }
@@ -376,9 +376,12 @@ export const handlers: Record<string, Handler> = {
       }
     }
 
-    const proc = Bun.spawn(
+    // Spawn as a new session leader (detached) so killProcessTree can nuke the
+    // entire process group via kill(-pid). This prevents orphaned child processes.
+    const { spawn: nodeSpawn } = await import("child_process");
+    const proc = nodeSpawn(
+      "code",
       [
-        "code",
         "serve-web",
         "--host",
         "127.0.0.1",
@@ -391,18 +394,27 @@ export const handlers: Record<string, Handler> = {
       ],
       {
         cwd: worktree,
-        stdout: "ignore",
-        stderr: "ignore",
+        stdio: "ignore",
+        detached: true,
       },
     );
+    // Unref so this process doesn't keep the workbench server alive
+    proc.unref();
 
     // Brief check — if the process crashes immediately, fail fast
-    const exited = await Promise.race([
-      proc.exited.then((code) => code),
-      new Promise<null>((r) => setTimeout(() => r(null), 500)),
-    ]);
+    const exited = await new Promise<number | null>((resolve) => {
+      proc.once("exit", (code) => resolve(code));
+      setTimeout(() => {
+        proc.removeAllListeners("exit");
+        resolve(null);
+      }, 500);
+    });
     if (exited !== null && exited !== 0) {
       throw { code: "VSCODE_START_FAILED", message: "code serve-web exited with code " + exited };
+    }
+
+    if (!proc.pid) {
+      throw { code: "VSCODE_START_FAILED", message: "code serve-web failed to start (no PID)" };
     }
 
     await updateState(branch, { vscode_pid: proc.pid, vscode_port: port });
@@ -417,8 +429,11 @@ export const handlers: Record<string, Handler> = {
     }
     const state = await readState(branch);
     if (state?.vscode_pid && isProcessAlive(state.vscode_pid)) {
-      const { killProcess } = await import("#lib/process");
-      killProcess(state.vscode_pid);
+      await killProcessTree(state.vscode_pid);
+    }
+    // Also kill any orphaned children still holding the port
+    if (state?.vscode_port) {
+      await killPortOccupants(state.vscode_port);
     }
     await updateState(branch, { vscode_pid: null, vscode_port: null });
     return { stopped: true };

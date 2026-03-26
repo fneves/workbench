@@ -27,7 +27,7 @@ body{background:#1e1e1e;color:#ccc;font-family:system-ui,sans-serif;display:flex
 p{font-size:14px;opacity:0.7}
 </style></head><body><div class="wrap">
 <div class="spinner"></div>
-<p>Starting VS Code\u2026</p>
+<p>Starting VS Code...</p>
 </div><script>
 const target=${JSON.stringify(targetUrl)};
 (async()=>{for(let i=0;i<60;i++){try{await fetch(target,{mode:'no-cors'});window.location.replace(target);return}catch(e){}await new Promise(r=>setTimeout(r,500))}
