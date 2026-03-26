@@ -22,7 +22,9 @@
     "lint:fix": "find src \\( -name '*.ts' -o -name '*.tsx' \\) -print0 | xargs -0 bunx oxlint --fix",
     "fmt": "oxfmt src/",
     "fmt:check": "oxfmt --check src/",
-    "check": "bun run typecheck && bun run lint && bun run fmt:check",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "check": "bun run test && bun run typecheck && bun run lint && bun run fmt:check",
     "build": "bun build --compile src/index.tsx --outfile dist/workbench",
     "install:local": "bun run build && ln -sf $(pwd)/dist/workbench ~/.local/bin/workbench"
   },

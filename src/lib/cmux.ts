@@ -226,7 +226,10 @@ async function cmuxCli(args: string[]): Promise<Record<string, any> | null> {
 function debugLog(msg: string) {
   try {
     const { appendFileSync } = require("fs");
-    appendFileSync("/tmp/workbench/vscode-debug.log", `[${new Date().toISOString()}] [cmux] ${msg}\n`);
+    appendFileSync(
+      "/tmp/workbench/vscode-debug.log",
+      `[${new Date().toISOString()}] [cmux] ${msg}\n`,
+    );
   } catch {}
 }
 

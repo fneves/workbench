@@ -434,7 +434,9 @@ function WatcherApp({ worktree, branch }: { worktree: string; branch: string }) 
               }
 
               vscodeSurfaceId.current = surfaceId;
-              vlog(`vscode opened surface=${surfaceId} port=${result.port} workspace=${myWorkspaceId ?? "none"}`);
+              vlog(
+                `vscode opened surface=${surfaceId} port=${result.port} workspace=${myWorkspaceId ?? "none"}`,
+              );
               if (surfaceId) {
                 // Persist surface ID so it survives watcher restarts
                 request("task.update", { branch, vscode_surface_id: surfaceId }).catch((err) =>
