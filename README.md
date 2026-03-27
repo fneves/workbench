@@ -31,6 +31,7 @@ A global dashboard lets you spawn tasks, monitor all running agents, and jump be
 
 ```bash
 # Prerequisites
+brew tap oven-sh/bun
 brew install bun git cmux
 
 # Clone and install
