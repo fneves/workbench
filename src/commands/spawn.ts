@@ -11,7 +11,7 @@ import {
   getRepoRoot,
   getDepsCloneEnabled,
 } from "#lib/config";
-import { detectPackageManager, getSourceNodeModules, writeShellInit } from "#lib/deps";
+import { detectPackageManager, writeDependencyLinksManifest, writeShellInit } from "#lib/deps";
 import { writeState, updateState, newTaskState } from "#lib/state";
 import { createWorktree } from "#lib/git";
 import {
@@ -164,15 +164,16 @@ export async function cmdSpawn(args: string[]): Promise<void> {
   });
   await writeState(branch, state);
 
-  // 2.5. Detect source node_modules for symlink optimization
-  let sourceNodeModules: string | null = null;
+  // 2.5. Detect source dependency links for symlink optimization
+  let dependencySharingEnabled = false;
   if (mode === "worktree" && !opts.noDeps && getDepsCloneEnabled()) {
     const repoRoot = getRepoRoot();
     const pm = detectPackageManager(repoRoot);
     if (pm) {
-      sourceNodeModules = getSourceNodeModules(repoRoot);
-      if (sourceNodeModules) {
-        writeShellInit(worktreeDir, repoRoot, pm);
+      const manifest = writeDependencyLinksManifest(worktreeDir, repoRoot);
+      if (manifest.links.length > 0) {
+        dependencySharingEnabled = true;
+        writeShellInit(worktreeDir, pm);
       }
     }
   }
@@ -286,7 +287,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
         agent,
         prompt,
         interactive,
-        sourceNodeModules,
+        dependencySharingEnabled,
       }),
     );
     chmodSync(wrapperFile, 0o755);

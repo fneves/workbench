@@ -18,7 +18,7 @@ export function generateAgentWrapper(opts: {
   agent: "claude" | "opencode";
   prompt: string;
   interactive: boolean;
-  sourceNodeModules?: string | null;
+  dependencySharingEnabled?: boolean;
 }): string {
   const notifyEnabled = getNotificationsEnabled();
   const soundsEnabled = getNotificationSoundsEnabled();
@@ -57,15 +57,9 @@ ${shellDiffPoller(diffPollSec)}
 cd "$WORKTREE_DIR"
 update_state "pid" "$$"
 ${
-  opts.sourceNodeModules
+  opts.dependencySharingEnabled
     ? `
-# --- Symlink node_modules ---
-if [[ ! -e "$WORKTREE_DIR/node_modules" ]] && [[ -d "${opts.sourceNodeModules}" ]]; then
-    ln -s "${opts.sourceNodeModules}" "$WORKTREE_DIR/node_modules"
-    echo -e "\\033[2m   node_modules symlinked\\033[0m"
-fi
-
-# Source package-manager wrappers (remove the symlink only when dependency commands need a local install)
+# Source package-manager wrappers (restore managed dependency links and short-circuit unchanged installs)
 [[ -f "$WORKTREE_DIR/.workbench-shell-init.sh" ]] && source "$WORKTREE_DIR/.workbench-shell-init.sh"
 `
     : ""
