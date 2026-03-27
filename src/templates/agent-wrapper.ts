@@ -18,6 +18,7 @@ export function generateAgentWrapper(opts: {
   agent: "claude" | "opencode";
   prompt: string;
   interactive: boolean;
+  sourceNodeModules?: string | null;
 }): string {
   const notifyEnabled = getNotificationsEnabled();
   const soundsEnabled = getNotificationSoundsEnabled();
@@ -54,8 +55,21 @@ ${shellDiffPoller(diffPollSec)}
 
 # --- Mark as running ---
 cd "$WORKTREE_DIR"
-update_state "status" "running"
 update_state "pid" "$$"
+${
+  opts.sourceNodeModules
+    ? `
+# --- Symlink node_modules ---
+if [[ ! -e "$WORKTREE_DIR/node_modules" ]] && [[ -d "${opts.sourceNodeModules}" ]]; then
+    ln -s "${opts.sourceNodeModules}" "$WORKTREE_DIR/node_modules"
+    echo -e "\\033[2m   node_modules symlinked\\033[0m"
+fi
+
+# Source package-manager wrappers (remove the symlink only when dependency commands need a local install)
+[[ -f "$WORKTREE_DIR/.workbench-shell-init.sh" ]] && source "$WORKTREE_DIR/.workbench-shell-init.sh"
+`
+    : ""
+}update_state "status" "running"
 
 echo ""
 echo -e "\\033[0;35m\\033[1m⚡ workbench\\033[0m — $BRANCH"

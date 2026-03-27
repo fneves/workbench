@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from "fs";
+import { createInterface } from "readline";
 import { WORKBENCH_DIR, WORKBENCH_STATE_DIR, getRepoRoot } from "#lib/config";
 import { reconcileWorktrees } from "#lib/state";
+import { ensureShellHook, installShellHook } from "#lib/deps";
 import { isInsideCmux } from "#lib/cmux";
 import { WorkbenchServer, isServerRunning } from "#server";
 
@@ -29,6 +31,29 @@ export async function cmdStart(): Promise<void> {
 
   // Reconcile existing worktrees with state files
   await reconcileWorktrees();
+
+  // Check if the zsh shell hook is installed (for node_modules symlink support)
+  const { needsSetup } = ensureShellHook();
+  if (needsSetup) {
+    console.log(
+      `${C.dim}The workbench shell hook enables instant node_modules in worktrees.${C.nc}`,
+    );
+    console.log(
+      `${C.dim}It adds a zsh chpwd hook that auto-sources worktree-specific wrappers.${C.nc}`,
+    );
+    const answer = await promptYesNo("Add shell hook to ~/.zshrc?");
+    if (answer) {
+      installShellHook();
+      console.log(
+        `${C.green}Shell hook installed. Restart your shell or run: source ~/.zshrc${C.nc}`,
+      );
+    } else {
+      console.log(
+        `${C.dim}Skipped. You can add it manually: source ~/.workbench/shell-init.zsh${C.nc}`,
+      );
+    }
+    console.log();
+  }
 
   if (!isInsideCmux()) {
     console.log(`${C.red}Error: Must be running inside cmux.${C.nc}`);
@@ -65,4 +90,14 @@ export async function cmdStart(): Promise<void> {
   console.log(`${C.green}Launching dashboard...${C.nc}`);
   const { runDashboard } = await import("#modes/dashboard/Dashboard");
   await runDashboard();
+}
+
+function promptYesNo(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(`${question} [y/N] `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === "y");
+    });
+  });
 }

@@ -27,6 +27,7 @@ export interface WorkbenchConfig {
     diff_poll_sec?: number;
     dashboard_poll_ms?: number;
   };
+  deps_clone?: boolean;
 }
 
 const CONFIG_FILE = `${WORKBENCH_DIR}/config.toml`;
@@ -55,6 +56,9 @@ export const CONFIG_TEMPLATE = `# workbench configuration — ~/.workbench/confi
 
 # Path to Claude credentials on the host (mounted read-only into containers)
 # container_claude_home = "~/.claude"
+
+# Clone node_modules into worktrees using APFS copy-on-write (macOS only)
+# deps_clone = true
 
 [notifications]
 # enabled = true
@@ -158,6 +162,10 @@ export function getDiffPollSec(): number {
 
 export function getDashboardPollMs(): number {
   return getConfig().intervals?.dashboard_poll_ms ?? 1000;
+}
+
+export function getDepsCloneEnabled(): boolean {
+  return getConfig().deps_clone ?? true;
 }
 
 // --- Legacy constants (backwards compat) ---

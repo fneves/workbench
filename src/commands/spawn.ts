@@ -8,7 +8,10 @@ import {
   getHostWorktreePath,
   getStateFile,
   branchToSlug,
+  getRepoRoot,
+  getDepsCloneEnabled,
 } from "#lib/config";
+import { detectPackageManager, getSourceNodeModules, writeShellInit } from "#lib/deps";
 import { writeState, updateState, newTaskState } from "#lib/state";
 import { createWorktree } from "#lib/git";
 import {
@@ -48,6 +51,7 @@ interface SpawnOpts {
   mode: "worktree" | "container";
   baseBranch: string;
   interactive: boolean;
+  noDeps: boolean;
 }
 
 export function parseSpawnArgs(args: string[]): SpawnOpts {
@@ -58,6 +62,7 @@ export function parseSpawnArgs(args: string[]): SpawnOpts {
     mode: "worktree",
     baseBranch: DEFAULT_BASE_BRANCH,
     interactive: false,
+    noDeps: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -86,6 +91,10 @@ export function parseSpawnArgs(args: string[]): SpawnOpts {
       case "-i":
       case "--interactive":
         opts.interactive = true;
+        break;
+      case "-D":
+      case "--no-deps":
+        opts.noDeps = true;
         break;
       case "-h":
       case "--help":
@@ -118,6 +127,7 @@ function printSpawnUsage(): void {
   console.log(
     `  ${C.cyan}-i, --interactive${C.nc}  Interactive mode (no -p); supports container devcontainers`,
   );
+  console.log(`  ${C.cyan}-D, --no-deps${C.nc}      Skip node_modules cloning`);
 }
 
 export async function cmdSpawn(args: string[]): Promise<void> {
@@ -153,6 +163,19 @@ export async function cmdSpawn(args: string[]): Promise<void> {
     prompt,
   });
   await writeState(branch, state);
+
+  // 2.5. Detect source node_modules for symlink optimization
+  let sourceNodeModules: string | null = null;
+  if (mode === "worktree" && !opts.noDeps && getDepsCloneEnabled()) {
+    const repoRoot = getRepoRoot();
+    const pm = detectPackageManager(repoRoot);
+    if (pm) {
+      sourceNodeModules = getSourceNodeModules(repoRoot);
+      if (sourceNodeModules) {
+        writeShellInit(worktreeDir, repoRoot, pm);
+      }
+    }
+  }
 
   // 3. Write agent wrapper script
   const slug = branchToSlug(branch);
@@ -263,6 +286,7 @@ export async function cmdSpawn(args: string[]): Promise<void> {
         agent,
         prompt,
         interactive,
+        sourceNodeModules,
       }),
     );
     chmodSync(wrapperFile, 0o755);
